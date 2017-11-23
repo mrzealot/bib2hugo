@@ -1,0 +1,8 @@
+{
+    "pdfFolder": "path/to/pdfs, optional",
+    "pdfLink": "link to pdfs, e.g., the [LINK] part in example.com/[LINK]/something.pdf (default: 'pdf')",
+    "pptFolder": "path/to/presentations, optional",
+    "pptLink": "link to presentations, like above (default: 'presentation')",
+    "blacklist": ["array", "of", "blacklisted", "bib", "keys"],
+    "whitelist": ["array", "of", "whitelisted", "bib", "keys"]
+}

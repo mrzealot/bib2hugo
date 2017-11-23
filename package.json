@@ -1,0 +1,20 @@
+{
+  "name": "bib2hugo",
+  "version": "1.0.0",
+  "description": "Compile publication pages fit for the Hugo Academic theme from a .bib source",
+  "main": "bib2hugo.js",
+  "scripts": {
+    "build": "webpack && nexe -i bib2hugo.bundle.js -o bib2hugo -t 9.1.0"
+  },
+  "author": "Bán Dénes <mr@zealot.hu>",
+  "license": "MIT",
+  "dependencies": {
+    "bibtex-parse-js": "0.0.24",
+    "latex-to-unicode-converter": "mrzealot/latex-to-unicode-converter#16b8a31"
+  },
+  "devDependencies": {
+    "babel-loader": "^7.1.2",
+    "babel-preset-es2015": "^6.24.1",
+    "webpack": "^3.8.1"
+  }
+}
