@@ -1,7 +1,7 @@
 # bib2hugo
 Compile publication pages fit for the Hugo Academic theme from a .bib source
 
-###Install:
+### Install:
 
 ```
 npm install -g webpack nexe
@@ -20,7 +20,7 @@ npm run build
 The result is a standalone bib2hugo.bundle.js and bib2hugo.exe.
 ...or just use the dist folder.
 
-###Useage:
+### Usage:
 
 ```
 bib2hugo inputBib outputFolder [configJSON]
