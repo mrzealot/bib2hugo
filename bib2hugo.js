@@ -68,10 +68,11 @@ function abstractize(val) {
 }
 
 function findFile(folder, needle) {
+    var pattern = new RegExp( '^(.*[^a-zA-z0-9])?' + needle + '([^a-zA-Z0-9].*)?$' );
     var result = null;
     try {
         fs.readdirSync(folder).forEach(function(file) {
-            if ( file.indexOf(needle) !== -1 ) {
+            if ( file.match(pattern) ) {
                 result = file;
                 return false;
             }
