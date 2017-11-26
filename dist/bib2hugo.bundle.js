@@ -1821,7 +1821,7 @@ function convert(val) {
 }
 
 function str(val) {
-    var ret = val;
+    var ret = val || '';
     ret = ret.replace(/\\&/g, '&');
     ret = ret.replace(/\\%/g, '%');
     ret = ret.replace(/\\#/g, '#');
