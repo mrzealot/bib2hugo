@@ -4,7 +4,7 @@
   "description": "Compile publication pages fit for the Hugo Academic theme from a .bib source",
   "main": "bib2hugo.js",
   "scripts": {
-    "build": "webpack && nexe -i bib2hugo.bundle.js -o bib2hugo -t 9.1.0"
+    "build": "webpack && nexe -i dist/bib2hugo.bundle.js -o dist/bib2hugo -t 9.1.0"
   },
   "author": "Bán Dénes <mr@zealot.hu>",
   "license": "MIT",

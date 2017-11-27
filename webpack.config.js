@@ -6,7 +6,7 @@ var libraryName = 'bib2hugo';
 var config = {
     entry: path.join(__dirname, libraryName + '.js'),
     output: {
-        path: __dirname,
+        path: path.join(__dirname, 'dist'),
         filename: libraryName + '.bundle.js',
         libraryTarget: 'umd',
         library: libraryName

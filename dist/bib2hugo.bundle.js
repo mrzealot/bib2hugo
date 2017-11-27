@@ -1945,30 +1945,30 @@ bib.forEach(function (entry) {
             // if there is no "pages" for a conference paper, there'd better be an explanation
             output += entry.entryTags.note + '"\n';
         }
-        output += 'publication_types = ["1"]\n';
+        output += 'publication_types = ["2"]\n';
     } else if (type == 'article') {
         output += 'publication = "' + str(entry.entryTags.journal) + ', ' + str(entry.entryTags.volume) + (
         // html entities for left/right parens to avoid incorrect markdownification
         entry.entryTags.number ? '&#40;' + str(entry.entryTags.number) + '&#41;' : '') + ':' + str(entry.entryTags.pages) + '"\n';
-        output += 'publication_types = ["2"]\n';
+        output += 'publication_types = ["0"]\n';
     } else if (type == 'incollection') {
         output += 'publication = "' + str(entry.entryTags.booktitle) + ', ' + 'Page' + pagePlural + ' ' + str(entry.entryTags.pages) + '"\n';
-        output += 'publication_types = ["3"]\n';
+        output += 'publication_types = ["1"]\n';
     } else if (type == 'proceedings') {
-        output += 'publication_types = ["4"]\n';
+        output += 'publication_types = ["5"]\n';
     } else if (type == 'book') {
         output += 'publication = "' + str(entry.entryTags.series) + ', ' + str(entry.entryTags.volume) + (
         // html entities for left/right parens to avoid incorrect markdownification
         entry.entryTags.number ? '&#40;' + str(entry.entryTags.number) + '&#41;' : '') + '"\n';
-        output += 'publication_types = ["5"]\n';
-    } else if (type == 'techreport') {
-        output += 'publication_types = ["8"]\n';
-    } else if (type == 'mastersthesis') {
         output += 'publication_types = ["6"]\n';
-    } else if (type == 'phdthesis') {
+    } else if (type == 'techreport') {
         output += 'publication_types = ["7"]\n';
+    } else if (type == 'mastersthesis') {
+        output += 'publication_types = ["4"]\n';
+    } else if (type == 'phdthesis') {
+        output += 'publication_types = ["3"]\n';
     } else if (type == 'misc') {
-        output += 'publication_types = ["0"]\n';
+        output += 'publication_types = ["8"]\n';
     }
 
     // BiBTeX OUTPUT
