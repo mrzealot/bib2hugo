@@ -159,7 +159,8 @@ bib.forEach(function(entry) {
     if ( params.pptFolder ) {
         var ppt = findFile(params.pptFolder, key);
         if ( ppt ) {
-            output += 'url_presentation = "' + params.pptLink + '/' + ppt + '"\n';
+            console.log('PPT link: ' + ppt);
+            output += 'url_slides = "' + params.pptLink + '/' + ppt + '"\n';
         }
     }
 
