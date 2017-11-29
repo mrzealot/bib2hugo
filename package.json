@@ -10,7 +10,7 @@
   "license": "MIT",
   "dependencies": {
     "bibtex-parse-js": "0.0.24",
-    "latex-to-unicode-converter": "mrzealot/latex-to-unicode-converter#16b8a31"
+    "latex-to-unicode-converter": "0.5.2"
   },
   "devDependencies": {
     "babel-loader": "^7.1.2",
