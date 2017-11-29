@@ -70,7 +70,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 13);
+/******/ 	return __webpack_require__(__webpack_require__.s = 14);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -649,7 +649,7 @@ function __export(m) {
 Object.defineProperty(exports, "__esModule", { value: true });
 __export(__webpack_require__(2));
 __export(__webpack_require__(3));
-__export(__webpack_require__(20));
+__export(__webpack_require__(21));
 //# sourceMappingURL=main.js.map
 
 /***/ }),
@@ -1744,10 +1744,640 @@ exports.translateCharToSuperscript = function (char) { return isSuperscriptChara
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var space_1 = __webpack_require__(55);
-var diacritic_1 = __webpack_require__(56);
+exports.runesMap = {
+    "ra": {
+        "\\ae": "ᚨ",
+        "\\c": {
+            unicode: "ᚳ",
+            note: "approximation",
+        },
+        "\\d": {
+            unicode: "ᛞ",
+            note: "approximation",
+        },
+        "\\ea": "ᛠ",
+        "\\G": "ᚸ",
+        "\\g": {
+            unicode: "ᚸ",
+            note: "approximation",
+        },
+        "\\h": "ᚬ",
+        "\\j": "ᛄ",
+        "\\k": "ᛤ",
+        "\\ng": "ᛝ",
+        "\\OE": {
+            unicode: "ᛟ",
+            note: "approximation",
+        },
+        "\\oe": "ᛟ",
+        "\\rex": {
+            unicode: "𐎟",
+            note: "approximation",
+        },
+        "\\seight": {
+            unicode: "⦚",
+            note: "approximation",
+        },
+        "\\sfive": {
+            unicode: "⦚",
+            note: "approximation",
+        },
+        "\\sfour": {
+            unicode: "⦚",
+            note: "approximation",
+        },
+        "\\sseven": {
+            unicode: "⦚",
+            note: "approximation",
+        },
+        "\\ssix": {
+            unicode: "⦚",
+            note: "approximation",
+        },
+        "\\stan": {
+            unicode: "ᛥ",
+            note: "approximation",
+        },
+        "\\STAN": "ᛥ",
+        "\\sthree": "ᛊ",
+        "\\th": "ᚦ",
+        "\\y": {
+            unicode: "ᚤ",
+            note: "approximation",
+        },
+        "a": "ᚪ",
+        "B": {
+            unicode: "ᛒ",
+            note: "approximation",
+        },
+        "b": "ᛒ",
+        "c": "ᚳ",
+        "D": {
+            unicode: "ᛞ",
+            note: "approximation",
+        },
+        "d": "ᛞ",
+        "e": "ᛖ",
+        "F": {
+            unicode: "ᚠ",
+            note: "approximation",
+        },
+        "f": "ᚠ",
+        "g": "ᚷ",
+        "H": {
+            unicode: "ᚺ",
+            note: "approximation",
+        },
+        "h": "ᚻ",
+        "i": "ᛁ",
+        "I": {
+            unicode: "ᛇ",
+            "latex2": "\\\"i"
+        },
+        "\\\"i": "ᛇ",
+        "J": {
+            unicode: "+",
+            note: "approximation",
+        },
+        "j": "ᚼ",
+        "k": "ᚲ",
+        "l": "ᛚ",
+        "m": "ᛗ",
+        "n": "ᚾ",
+        "o": "ᚩ",
+        "P": {
+            unicode: "⥏",
+            note: "approximation",
+        },
+        "p": "ᛈ",
+        "q": "ᛢ",
+        "r": "ᚱ",
+        "S": {
+            unicode: "⦚",
+            note: "approximation",
+        },
+        "s": "ᛋ",
+        "t": "ᛏ",
+        "U": {
+            unicode: "Λ",
+            note: "approximation",
+        },
+        "u": "ᚢ",
+        "w": "ᚹ",
+        "x": "ᛉ",
+        "Y": {
+            unicode: "ᚥ",
+            note: "approximation",
+        },
+        "y": {
+            unicode: "ᚣ",
+            note: "approximation",
+        }
+    },
+    "rc": {
+        "\\A": "ᚼ",
+        "\\a": {
+            unicode: "┝",
+            note: "approximation",
+        },
+        "\\d": {
+            unicode: "⋈",
+            note: "approximation",
+        },
+        "\\h": "ᚻ",
+        "\\i": {
+            unicode: "⥍",
+            note: "approximation",
+        },
+        "\\ing": {
+            unicode: "ᛄ",
+            note: "approximation",
+        },
+        "\\Ing": {
+            unicode: "ᛄ",
+            note: "approximation",
+        },
+        "\\ING": "ᛄ",
+        "\\j": {
+            unicode: "ᛃ",
+            note: "approximation",
+        },
+        "\\k": {
+            unicode: "⌵",
+            note: "approximation",
+        },
+        "\\K": {
+            unicode: "Υ",
+            note: "approximation",
+        },
+        "\\ng": "ᛜ",
+        "\\NG": {
+            unicode: "⸋",
+            note: "approximation",
+        },
+        "\\p": {
+            unicode: "ᛒ", note: "but with dot in lower"
+        },
+        "\\R": "ᛦ",
+        "\\RR": {
+            unicode: "ᛯ",
+            note: "approximation",
+        },
+        "\\s": "ᛋ",
+        "\\S": "ᛋ",
+        "\\seight": {
+            unicode: "⦚",
+            note: "approximation",
+        },
+        "\\sfive": {
+            unicode: "⦚",
+            note: "approximation",
+        },
+        "\\sseven": {
+            unicode: "⦚",
+            note: "approximation",
+        },
+        "\\sthree": {
+            unicode: "⦚",
+            note: "approximation",
+        },
+        "\\th": "ᚦ",
+        "a": "ᚨ",
+        "A": "ᛋ",
+        "b": "ᛒ",
+        "B": {
+            unicode: "ᛒ",
+            note: "approximation",
+        },
+        "d": "ᛞ",
+        "D": {
+            unicode: "▯",
+            note: "approximation",
+        },
+        "e": "ᛖ",
+        "E": {
+            unicode: "⨅",
+            note: "approximation",
+        },
+        "f": {
+            unicode: "ᚠ",
+            note: "but skinny"
+        },
+        "F": "ᚠ",
+        "g": "ᚷ",
+        "h": "ᚺ",
+        "H": {
+            unicode: "𝖭",
+            note: "approximation",
+        },
+        "i": "ᛁ",
+        "I": {
+            unicode: "⥌",
+            note: "approximation",
+        }, "\\\"i": {
+            unicode: "⥌",
+            note: "approximation",
+        },
+        "j": "ᛃ",
+        "J": {
+            unicode: "ϟ",
+            note: "but with box"
+        },
+        "k": "ᚲ",
+        "K": {
+            unicode: "Ⴤ",
+            note: "approximation",
+        },
+        "l": "ᛚ",
+        "m": "ᛗ",
+        "n": "ᚾ",
+        "o": "ᛟ",
+        "p": "ᛈ",
+        "P": {
+            unicode: "P",
+            note: "approximation",
+        },
+        "r": "ᚱ",
+        "R": "ᛉ",
+        "s": "ᛊ",
+        "\\sfour": "ᛊ",
+        "S": {
+            unicode: "⦚",
+            note: "approximation",
+        },
+        "t": "ᛏ",
+        "T": {
+            unicode: "ᛏ",
+            note: "approximation",
+        },
+        "u": "ᚢ",
+        "U": {
+            unicode: "Λ",
+            note: "approximation",
+        },
+        "w": "ᚹ"
+    },
+    "rm": {
+        "\\a": "ᛆ", ".a": "ᛆ",
+        "\\adot": {
+            note: "ᛂ+ᛅ",
+        }, "'a": {
+            note: "ᛂ+ᛅ",
+        },
+        "\\c": "ᛍ", ".c": "ᛍ",
+        "\\D": {
+            note: "Arrow with two dots",
+        }, "T": {
+            note: "Arrow with two dots",
+        },
+        "\\e": {
+            unicode: "⟊",
+            note: "approximation",
+        }, "=i": {
+            unicode: "⟊",
+            note: "approximation",
+        },
+        "\\g": {
+            unicode: "?",
+            note: "approximation",
+        }, "=k": {
+            unicode: "?",
+            note: "approximation",
+        },
+        "\\h": {
+            unicode: "⚹",
+            note: "approximation",
+        },
+        "\\l": "ᛛ", ".l": "ᛛ",
+        "\\lbar": {
+            note: "ᛚ with bar",
+        }, "=l": {
+            note: "ᛚ with bar",
+        },
+        "\\ldot": {
+            note: "ᛚ with dot",
+        }, "'l": {
+            note: "ᛚ with dot",
+        },
+        "\\lflag": {
+            note: "ᛚ with flag",
+        }, "~l": {
+            note: "ᛚ with flag",
+        },
+        "\\lring": {
+            note: "ᛚ with ring",
+        }, "^l": {
+            note: "ᛚ with ring",
+        },
+        "\\m": {
+            unicode: "ᚴ",
+            note: "but mirrored"
+        },
+        "\\n": {
+            unicode: "ᛀ",
+            note: "approximation",
+        }, ".n": {
+            unicode: "ᛀ",
+            note: "approximation",
+        },
+        "\\N": "ᛀ", ".N": "ᛀ",
+        "\\ndot": {
+            note: "ᚿ+ᛀ",
+        }, "'n": {
+            note: "ᚿ+ᛀ",
+        },
+        "\\p": {
+            unicode: "ᛒ",
+            note: "but with dot in lower"
+        }, ".b": {
+            unicode: "ᛒ",
+            note: "but with dot in lower"
+        },
+        "\\P": "ᛕ",
+        "\\Pdots": {
+            note: "ᛕ with dots",
+        },
+        "\\q": {
+            note: "ᚴ mirrored",
+        },
+        "\\Q": {
+            note: "ᛕ mirrored",
+        },
+        "\\r": {
+            unicode: "?",
+            note: "approximation",
+        },
+        "\\rdot": {
+            note: "ᚱ with dot",
+        }, ".r": {
+            note: "ᚱ with dot",
+        },
+        "\\tbar": {
+            unicode: "ᛑ",
+            note: "but with bar"
+        }, "=t": {
+            unicode: "ᛑ",
+            note: "but with bar"
+        },
+        "\\tdot": {
+            unicode: "ᛑ",
+            note: "but dot translated upper left"
+        }, "'t": {
+            unicode: "ᛑ",
+            note: "but dot translated upper left"
+        },
+        "\\tflag": {
+            unicode: "ᛑ",
+            note: "but with flag"
+        }, "~t": {
+            unicode: "ᛑ",
+            note: "but with flag"
+        },
+        "\\tring": {
+            unicode: "ᛑ",
+            note: "but with ring"
+        }, "^t": {
+            unicode: "ᛑ",
+            note: "but with ring"
+        },
+        "a": "ᛆ",
+        "A": {
+            unicode: "ᛆ",
+            note: "but with bigger leg"
+        },
+        "b": "ᛒ",
+        "B": {
+            unicode: "ᛒ",
+            note: "but like b"
+        },
+        "c": "ᛌ",
+        "C": {
+            unicode: "ᛍ",
+            note: "approximation",
+        }, "^c": {
+            unicode: "ᛍ",
+            note: "approximation",
+        },
+        "d": "ᛑ", ".t": "ᛑ",
+        "D": {
+            note: "ᛏ+ᛂ",
+        }, ".T": {
+            note: "ᛏ+ᛂ",
+        },
+        "e": "ᛂ", ".i": "ᛂ",
+        "E": {
+            unicode: "ᛂ",
+            note: "but with ring"
+        }, "^i": {
+            unicode: "ᛂ",
+            note: "but with ring"
+        },
+        "f": "ᚠ",
+        "F": {
+            note: "ᚠ with extra branch",
+        },
+        "g": "ᚵ", ".k": "ᚵ",
+        "G": {
+            unicode: "ᚵ",
+            note: "but dot translated bottom left"
+        }, "'k": {
+            unicode: "ᚵ",
+            note: "but dot translated bottom left"
+        },
+        "h": "ᚼ",
+        "H": {
+            unicode: "✳",
+            note: "approximation",
+        },
+        "i": "ᛧ",
+        "k": "ᚴ",
+        "l": "ᛚ",
+        "m": "ᛘ",
+        "n": "ᚿ",
+        "N": "ᚾ",
+        "o": "ᚮ",
+        "p": "ᛔ",
+        "P": "ᚹ",
+        "q": {
+            note: "ᚹ mirrored",
+        },
+        "r": "ᚱ"
+    },
+    "rn": {
+        ".i": "ᛂ", "e": "ᛂ",
+        ".k": "ᚵ", "g": "ᚵ",
+        ".u": "ᚤ", "y": "ᚤ",
+        "\\m": {
+            note: "ᛘ with dots",
+        },
+        "M": {
+            note: "⫯ with plus",
+        }, "\\M": {
+            note: "⫯ with plus",
+        },
+        "\\A": "ᚬ",
+        "\\bar": {
+            unicode: "❘",
+            note: "approximation",
+        }, "!": {
+            unicode: "❘",
+            note: "approximation",
+        },
+        "\\cross": "⨯", "*": "⨯",
+        "\\dot": "᛫", ".": "᛫",
+        "\\doublebar": "¦",
+        "\\doublecross": {
+            note: "two stacked x's",
+        },
+        "\\doubledot": "᛬", ":": "᛬",
+        "\\doubleeye": "᛬",
+        "\\doubleplus": {
+            unicode: "‡",
+            note: "approximation",
+        },
+        "\\eye": "᛫",
+        "\\pentdot": {
+            unicode: "⹘",
+            note: "proposal",
+        },
+        "\\penteye": "⸭",
+        "\\plus": "᛭", "+": "᛭",
+        "\\quaddot": "⁞",
+        "\\quadeye": {
+            unicode: "⁘",
+            note: "approximation",
+        },
+        "\\star": {
+            unicode: "*",
+            note: "approximation",
+        },
+        "\\th": "ᚦ",
+        "\\TH": {
+            unicode: "ᚦ",
+            note: "approximation",
+        },
+        "\\triplebar": "┆",
+        "\\triplecross": {
+            note: "three stacked x's",
+        },
+        "\\tripledot": "⁝",
+        "\\tripleeye": "⋮",
+        "\\tripleplus": {
+            note: "three stacked plusses",
+        },
+        "A": "ᚭ",
+        "a": "ᛅ",
+        "b": "ᛒ",
+        "B": {
+            unicode: "ᛒ",
+            note: "but skinny"
+        },
+        "f": "ᚠ",
+        "F": {
+            unicode: "ᚠ",
+            note: "but skinny"
+        },
+        "h": "ᚼ",
+        "i": "ᛁ",
+        "k": "ᚴ",
+        "l": "ᛚ",
+        "m": "ᛘ",
+        "n": "ᚾ",
+        "r": "ᚱ",
+        "R": "ᛣ",
+        "s": "ᛋ",
+        "S": {
+            unicode: "𝗁",
+            note: "but with sharp corner",
+        },
+        "t": "ᛏ",
+        "u": {
+            "latex1": "u"
+        }
+    },
+    "rt": {},
+    "rl": {
+        "\\A": {
+            unicode: "ߌ",
+            note: "approximation"
+        },
+        "\\th": "ᛧ",
+        "A": {
+            unicode: "`",
+            note: "approximation"
+        },
+        "a": {
+            unicode: "´",
+            note: "approximation"
+        },
+        "b": {
+            unicode: "´",
+            note: "approximation"
+        },
+        "f": {
+            unicode: "ߌ",
+            note: "approximation"
+        },
+        "h": "ᛙ",
+        "i": "ᛁ",
+        "k": "ᛍ",
+        "l": {
+            unicode: "`",
+            note: "approximation"
+        },
+        "m": {
+            unicode: ":",
+            note: "approximation"
+        },
+        "n": {
+            unicode: "`",
+            note: "approximation"
+        },
+        "r": {
+            unicode: "⎧",
+            note: "approximation"
+        },
+        "R": {
+            unicode: ":",
+            note: "approximation"
+        },
+        "s": "ᛧ",
+        "t": {
+            unicode: "´",
+            note: "approximation"
+        },
+        "u": {
+            unicode: "⎫",
+            note: "approximation"
+        }
+    }
+};
+exports.isRuneType = function (x) { return exports.runesMap.hasOwnProperty(x); };
+exports.runeUnicode = function (type, innerLatex) {
+    var runesType = exports.runesMap[type];
+    if (!runesType)
+        return undefined;
+    var found = runesType[innerLatex];
+    if (typeof found === "string")
+        return found;
+    if (found.unicode)
+        return found.unicode;
+    return undefined;
+};
+//# sourceMappingURL=runes.js.map
+
+/***/ }),
+/* 13 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+var space_1 = __webpack_require__(56);
+var diacritic_1 = __webpack_require__(57);
 var formatting_1 = __webpack_require__(10);
-exports.oneArgsCommands = Object.assign({}, space_1.spaceCmds1arg, formatting_1.formattingText, formatting_1.formattingMath, formatting_1.formattingNoMode, diacritic_1.diacriticsTextMode, diacritic_1.diacriticsMathMode, {
+var runes_1 = __webpack_require__(12);
+exports.oneArgsCommands = Object.assign({}, space_1.spaceCmds1arg, formatting_1.formattingText, formatting_1.formattingMath, formatting_1.formattingNoMode, diacritic_1.diacriticsTextMode, diacritic_1.diacriticsMathMode, runes_1.runesMap, {
     "cyrchar": true,
     "vec": true,
     "mono": true,
@@ -1765,16 +2395,16 @@ exports.is1argsCommand = is1argsCommand;
 //# sourceMappingURL=index.js.map
 
 /***/ }),
-/* 13 */
+/* 14 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var fs = __webpack_require__(14);
-var path = __webpack_require__(15);
-var bibtex = __webpack_require__(16);
-var converter = __webpack_require__(17);
+var fs = __webpack_require__(15);
+var path = __webpack_require__(16);
+var bibtex = __webpack_require__(17);
+var converter = __webpack_require__(18);
 
 //
 // ARGS
@@ -1805,7 +2435,18 @@ if (process.argv[4]) {
 
 var params = Object.assign({}, {
     pdfLink: 'pdf',
-    pptLink: 'presentation'
+    pptLink: 'presentation',
+    typeMap: {
+        article: '0',
+        incollection: '1',
+        inproceedings: '2',
+        phdthesis: '3',
+        mastersthesis: '4',
+        proceedings: '5',
+        book: '6',
+        techreport: '7',
+        misc: '8'
+    }
 }, config);
 
 //
@@ -1945,31 +2586,20 @@ bib.forEach(function (entry) {
             // if there is no "pages" for a conference paper, there'd better be an explanation
             output += entry.entryTags.note + '"\n';
         }
-        output += 'publication_types = ["2"]\n';
     } else if (type == 'article') {
         output += 'publication = "' + str(entry.entryTags.journal) + ', ' + str(entry.entryTags.volume) + (
         // html entities for left/right parens to avoid incorrect markdownification
         entry.entryTags.number ? '&#40;' + str(entry.entryTags.number) + '&#41;' : '') + ':' + str(entry.entryTags.pages) + '"\n';
-        output += 'publication_types = ["0"]\n';
     } else if (type == 'incollection') {
         output += 'publication = "' + str(entry.entryTags.booktitle) + ', ' + 'Page' + pagePlural + ' ' + str(entry.entryTags.pages) + '"\n';
-        output += 'publication_types = ["1"]\n';
-    } else if (type == 'proceedings') {
-        output += 'publication_types = ["5"]\n';
     } else if (type == 'book') {
         output += 'publication = "' + str(entry.entryTags.series) + ', ' + str(entry.entryTags.volume) + (
         // html entities for left/right parens to avoid incorrect markdownification
         entry.entryTags.number ? '&#40;' + str(entry.entryTags.number) + '&#41;' : '') + '"\n';
-        output += 'publication_types = ["6"]\n';
-    } else if (type == 'techreport') {
-        output += 'publication_types = ["7"]\n';
-    } else if (type == 'mastersthesis') {
-        output += 'publication_types = ["4"]\n';
-    } else if (type == 'phdthesis') {
-        output += 'publication_types = ["3"]\n';
-    } else if (type == 'misc') {
-        output += 'publication_types = ["8"]\n';
     }
+
+    var index = params.typeMap[type] || params.typeMap['misc'] || '0';
+    output += 'publication_types = ["' + index + '"]\n';
 
     // BiBTeX OUTPUT
 
@@ -2000,19 +2630,19 @@ bib.forEach(function (entry) {
 console.log('Done, processed ' + count + ' entries.');
 
 /***/ }),
-/* 14 */
+/* 15 */
 /***/ (function(module, exports) {
 
 module.exports = require("fs");
 
 /***/ }),
-/* 15 */
+/* 16 */
 /***/ (function(module, exports) {
 
 module.exports = require("path");
 
 /***/ }),
-/* 16 */
+/* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* start bibtexParse 0.0.24 */
@@ -2361,7 +2991,7 @@ module.exports = require("path");
 
 
 /***/ }),
-/* 17 */
+/* 18 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2370,20 +3000,20 @@ function __export(m) {
     for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
 }
 Object.defineProperty(exports, "__esModule", { value: true });
-__export(__webpack_require__(18));
 __export(__webpack_require__(19));
+__export(__webpack_require__(20));
 __export(__webpack_require__(4));
 __export(__webpack_require__(8));
 __export(__webpack_require__(1));
 __export(__webpack_require__(9));
-__export(__webpack_require__(63));
 __export(__webpack_require__(64));
-__export(__webpack_require__(12));
+__export(__webpack_require__(65));
+__export(__webpack_require__(13));
 //# sourceMappingURL=index.js.map
 
 
 /***/ }),
-/* 18 */
+/* 19 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2400,7 +3030,7 @@ exports.aliases = {
 //# sourceMappingURL=command-aliases.js.map
 
 /***/ }),
-/* 19 */
+/* 20 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2408,7 +3038,7 @@ exports.aliases = {
 Object.defineProperty(exports, "__esModule", { value: true });
 var options_1 = __webpack_require__(4);
 var latex_parser_1 = __webpack_require__(5);
-var convert_1 = __webpack_require__(21);
+var convert_1 = __webpack_require__(22);
 function convertLaTeX(options, src) {
     return convertLaTeXBlocks(options, latex_parser_1.mustNotBeUndefined(latex_parser_1.mustBeOk(latex_parser_1.latexParser.parse(src)).value));
 }
@@ -2437,7 +3067,7 @@ exports.convertLaTeXBlocks = convertLaTeXBlocks;
 //# sourceMappingURL=convert.js.map
 
 /***/ }),
-/* 20 */
+/* 21 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2765,7 +3395,7 @@ exports.mustBeOk = mustBeOk;
 //# sourceMappingURL=Parser.js.map
 
 /***/ }),
-/* 21 */
+/* 22 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2773,13 +3403,13 @@ exports.mustBeOk = mustBeOk;
 Object.defineProperty(exports, "__esModule", { value: true });
 var latex_parser_1 = __webpack_require__(5);
 var unknown_command_1 = __webpack_require__(8);
-var index_1 = __webpack_require__(22);
+var index_1 = __webpack_require__(23);
 var KnownCommand_1 = __webpack_require__(9);
-var index_2 = __webpack_require__(29);
-var index_3 = __webpack_require__(12);
-var sqrt_1 = __webpack_require__(57);
-var index_4 = __webpack_require__(58);
-var index_5 = __webpack_require__(61);
+var index_2 = __webpack_require__(30);
+var index_3 = __webpack_require__(13);
+var sqrt_1 = __webpack_require__(58);
+var index_4 = __webpack_require__(59);
+var index_5 = __webpack_require__(62);
 var CategoryCode_1 = __webpack_require__(6);
 function isString(x) {
     return typeof x === "string";
@@ -2845,8 +3475,12 @@ function convertTeXCommand(options, blockIndex, latex, current) {
             .map(function (latex) { return latex_parser_1.newFixArg([latex]); });
         if (argumentsToApply.length < value.argumentCount)
             throw new Error("Could not find enough arguments for command \\" + value.name + ". Expected " + value.argumentCount + ", but found " + argumentsToApply.length);
-        var result = [value.apply(function () {
-            }, argumentsToApply)];
+        if (!value.apply)
+            throw new Error("Can't apply " + JSON.stringify(value));
+        var result = [
+            value.apply(function () {
+            }, argumentsToApply)
+        ];
         if (rest.length > 0)
             result.push(rest.join(""));
         return {
@@ -3022,18 +3656,18 @@ exports.convertCommand = convertCommand;
 //# sourceMappingURL=convert.js.map
 
 /***/ }),
-/* 22 */
+/* 23 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var space_1 = __webpack_require__(23);
-var symbols_1 = __webpack_require__(24);
-var barred_letter_1 = __webpack_require__(25);
-var slashed_1 = __webpack_require__(26);
-var cyrillic_1 = __webpack_require__(27);
-var specialchars_1 = __webpack_require__(28);
+var space_1 = __webpack_require__(24);
+var symbols_1 = __webpack_require__(25);
+var barred_letter_1 = __webpack_require__(26);
+var slashed_1 = __webpack_require__(27);
+var cyrillic_1 = __webpack_require__(28);
+var specialchars_1 = __webpack_require__(29);
 exports.expand0argsCommand = function (name) {
     for (var _i = 0, _a = [
         barred_letter_1.barredLUnicode,
@@ -3052,7 +3686,7 @@ exports.expand0argsCommand = function (name) {
 //# sourceMappingURL=index.js.map
 
 /***/ }),
-/* 23 */
+/* 24 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3077,7 +3711,7 @@ exports.spaceUnicode = function (name) { return isSpaceCharactersUnicode(name) ?
 //# sourceMappingURL=space.js.map
 
 /***/ }),
-/* 24 */
+/* 25 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3786,7 +4420,7 @@ exports.characterUnicode = function (name) { return isCharacterUnicode(name) ? e
 //# sourceMappingURL=symbols.js.map
 
 /***/ }),
-/* 25 */
+/* 26 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3800,7 +4434,7 @@ exports.barredLUnicode = function (name) { return exports.barredLUnicodeChart[na
 //# sourceMappingURL=barred-letter.js.map
 
 /***/ }),
-/* 26 */
+/* 27 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3816,7 +4450,7 @@ exports.slashedOUnicode = function (char) { return exports.slashedOUnicodeChart[
 //# sourceMappingURL=slashed.js.map
 
 /***/ }),
-/* 27 */
+/* 28 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4015,7 +4649,7 @@ exports.cyrillicUnicode = function (name) { return exports.cyrillicUnicodeChart[
 //# sourceMappingURL=cyrillic.js.map
 
 /***/ }),
-/* 28 */
+/* 29 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4044,17 +4678,18 @@ exports.specialCharacter = function (name) { return isSpecialCharacter(name) ? e
 //# sourceMappingURL=specialchars.js.map
 
 /***/ }),
-/* 29 */
+/* 30 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var index_1 = __webpack_require__(30);
-var index_2 = __webpack_require__(43);
-var cyrillic_1 = __webpack_require__(52);
-var dingbats_1 = __webpack_require__(53);
-var elsevier_1 = __webpack_require__(54);
+var index_1 = __webpack_require__(31);
+var index_2 = __webpack_require__(44);
+var cyrillic_1 = __webpack_require__(53);
+var dingbats_1 = __webpack_require__(54);
+var elsevier_1 = __webpack_require__(55);
+var runes_1 = __webpack_require__(12);
 function expand1argsCommand(name, arg) {
     switch (name) {
         case "cyrchar":
@@ -4079,7 +4714,8 @@ function expand1argsCommand(name, arg) {
         default:
             for (var _i = 0, _a = [
                 index_1.diacriticUnicode,
-                index_2.formattingUnicode
+                index_2.formattingUnicode,
+                runes_1.runeUnicode,
             ]; _i < _a.length; _i++) {
                 var fn = _a[_i];
                 var result = fn(name, arg);
@@ -4093,25 +4729,25 @@ exports.expand1argsCommand = expand1argsCommand;
 //# sourceMappingURL=index.js.map
 
 /***/ }),
-/* 30 */
+/* 31 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var mathring_1 = __webpack_require__(31);
-var acute_1 = __webpack_require__(32);
-var grave_1 = __webpack_require__(33);
-var circumflex_1 = __webpack_require__(34);
-var tilde_1 = __webpack_require__(35);
-var dieresis_1 = __webpack_require__(36);
-var cedilla_1 = __webpack_require__(37);
-var caron_1 = __webpack_require__(38);
+var mathring_1 = __webpack_require__(32);
+var acute_1 = __webpack_require__(33);
+var grave_1 = __webpack_require__(34);
+var circumflex_1 = __webpack_require__(35);
+var tilde_1 = __webpack_require__(36);
+var dieresis_1 = __webpack_require__(37);
+var cedilla_1 = __webpack_require__(38);
+var caron_1 = __webpack_require__(39);
 var util_1 = __webpack_require__(1);
-var ogonek_1 = __webpack_require__(39);
-var tie_letters_1 = __webpack_require__(40);
-var vectorArrow_1 = __webpack_require__(41);
-var longHungarianUmlaut_1 = __webpack_require__(42);
+var ogonek_1 = __webpack_require__(40);
+var tie_letters_1 = __webpack_require__(41);
+var vectorArrow_1 = __webpack_require__(42);
+var long_hungarian_umlaut_1 = __webpack_require__(43);
 exports.barUnderLetter = util_1.simpleSuffix("\u0331");
 exports.dotUnderLetter = util_1.simpleSuffix("\u0323");
 exports.breve = util_1.simpleSuffix("\u0306");
@@ -4125,7 +4761,7 @@ exports.modifiersTextModeUnicodeChart = {
     "=": exports.macrron,
     ".": exports.dotOverLetter,
     '"': dieresis_1.dieresis,
-    "H": longHungarianUmlaut_1.longHungarianUmlaut,
+    "H": long_hungarian_umlaut_1.longHungarianUmlaut,
     "c": cedilla_1.cedilla,
     "k": ogonek_1.ogonek,
     "b": exports.barUnderLetter,
@@ -4152,7 +4788,7 @@ exports.diacriticUnicode = function (str, arg) {
 //# sourceMappingURL=index.js.map
 
 /***/ }),
-/* 31 */
+/* 32 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4167,7 +4803,7 @@ exports.ringOverLetter = command_expander_1.lookupOrAppend({
 //# sourceMappingURL=mathring.js.map
 
 /***/ }),
-/* 32 */
+/* 33 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4195,7 +4831,7 @@ exports.acuteAccent = command_expander_1.lookupOrAppend({
 //# sourceMappingURL=acute.js.map
 
 /***/ }),
-/* 33 */
+/* 34 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4217,7 +4853,7 @@ exports.graveAccent = command_expander_1.lookupOrAppend({
 //# sourceMappingURL=grave.js.map
 
 /***/ }),
-/* 34 */
+/* 35 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4239,7 +4875,7 @@ exports.circumflex = command_expander_1.lookupOrAppend({
 //# sourceMappingURL=circumflex.js.map
 
 /***/ }),
-/* 35 */
+/* 36 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4257,7 +4893,7 @@ exports.tilde = command_expander_1.lookupOrAppend({
 //# sourceMappingURL=tilde.js.map
 
 /***/ }),
-/* 36 */
+/* 37 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4281,7 +4917,7 @@ exports.dieresis = command_expander_1.lookupOrAppend({
 //# sourceMappingURL=dieresis.js.map
 
 /***/ }),
-/* 37 */
+/* 38 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4294,7 +4930,7 @@ exports.cedilla = command_expander_1.lookupOrAppend({
 //# sourceMappingURL=cedilla.js.map
 
 /***/ }),
-/* 38 */
+/* 39 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4307,7 +4943,7 @@ exports.caron = command_expander_1.lookupOrAppend({
 //# sourceMappingURL=caron.js.map
 
 /***/ }),
-/* 39 */
+/* 40 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4318,7 +4954,7 @@ exports.ogonek = util_1.simpleSuffix("\u0328");
 //# sourceMappingURL=ogonek.js.map
 
 /***/ }),
-/* 40 */
+/* 41 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4339,7 +4975,7 @@ exports.isTieLetters = isTieLetters;
 //# sourceMappingURL=tie-letters.js.map
 
 /***/ }),
-/* 41 */
+/* 42 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4350,7 +4986,7 @@ exports.vectorArrow = command_expander_1.lookupOrAppend({}, "\u20D7");
 //# sourceMappingURL=vectorArrow.js.map
 
 /***/ }),
-/* 42 */
+/* 43 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4363,25 +4999,25 @@ exports.longHungarianUmlaut = command_expander_1.lookupOrAppend({
     O: "Ő",
     U: "Ű",
 }, "\u030B");
-//# sourceMappingURL=longHungarianUmlaut.js.map
+//# sourceMappingURL=long-hungarian-umlaut.js.map
 
 /***/ }),
-/* 43 */
+/* 44 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var blackboard_1 = __webpack_require__(44);
-var boldfont_1 = __webpack_require__(45);
-var fraktur_1 = __webpack_require__(46);
-var italic_1 = __webpack_require__(47);
-var monospace_1 = __webpack_require__(48);
-var textcal_1 = __webpack_require__(49);
+var blackboard_1 = __webpack_require__(45);
+var boldfont_1 = __webpack_require__(46);
+var fraktur_1 = __webpack_require__(47);
+var italic_1 = __webpack_require__(48);
+var monospace_1 = __webpack_require__(49);
+var textcal_1 = __webpack_require__(50);
 var formatting_1 = __webpack_require__(10);
-var subscript_1 = __webpack_require__(50);
+var subscript_1 = __webpack_require__(51);
 var superscript_1 = __webpack_require__(11);
-var mono_1 = __webpack_require__(51);
+var mono_1 = __webpack_require__(52);
 exports.formattingUnicode = function (cmdName, arg) {
     var fn = undefined;
     if (formatting_1.isBbCmd(cmdName))
@@ -4412,7 +5048,7 @@ exports.formattingUnicode = function (cmdName, arg) {
 //# sourceMappingURL=index.js.map
 
 /***/ }),
-/* 44 */
+/* 45 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4490,7 +5126,7 @@ exports.translateCharToBlackboard = function (char) { return isBlackboardCharact
 //# sourceMappingURL=blackboard.js.map
 
 /***/ }),
-/* 45 */
+/* 46 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4626,7 +5262,7 @@ exports.translateCharToBold = function (char) { return isBlackboardCharacter(cha
 //# sourceMappingURL=boldfont.js.map
 
 /***/ }),
-/* 46 */
+/* 47 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4694,7 +5330,7 @@ exports.translateCharToFraktur = function (char) { return isFrakturCharacter(cha
 //# sourceMappingURL=fraktur.js.map
 
 /***/ }),
-/* 47 */
+/* 48 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4820,7 +5456,7 @@ exports.translateCharToItalic = function (char) { return isItalicCharacter(char)
 //# sourceMappingURL=italic.js.map
 
 /***/ }),
-/* 48 */
+/* 49 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4898,7 +5534,7 @@ exports.translateCharToMonospace = function (char) { return isMonospaceCharacter
 //# sourceMappingURL=monospace.js.map
 
 /***/ }),
-/* 49 */
+/* 50 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4966,7 +5602,7 @@ exports.translateCharToCalligraphic = function (char) { return isCalligraphicLet
 //# sourceMappingURL=textcal.js.map
 
 /***/ }),
-/* 50 */
+/* 51 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5019,7 +5655,7 @@ exports.translateCharToSubscript = function (char) { return isSubscriptCharacter
 //# sourceMappingURL=subscript.js.map
 
 /***/ }),
-/* 51 */
+/* 52 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5097,7 +5733,7 @@ exports.translateCharToMono = function (char) { return isMonoCharacter(char) ? e
 //# sourceMappingURL=mono.js.map
 
 /***/ }),
-/* 52 */
+/* 53 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5309,7 +5945,7 @@ exports.translateCharToCyrillic = function (char) {
 //# sourceMappingURL=cyrillic.js.map
 
 /***/ }),
-/* 53 */
+/* 54 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5512,7 +6148,7 @@ exports.translateCharToDingbat = function (char) { return isDingbatCharacter(cha
 //# sourceMappingURL=dingbats.js.map
 
 /***/ }),
-/* 54 */
+/* 55 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5575,7 +6211,7 @@ exports.translateCharToElsevier = function (char) { return isElsevierGlyph(char)
 //# sourceMappingURL=elsevier.js.map
 
 /***/ }),
-/* 55 */
+/* 56 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5590,7 +6226,7 @@ exports.spaceCmds1arg = {
 //# sourceMappingURL=space.js.map
 
 /***/ }),
-/* 56 */
+/* 57 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5631,7 +6267,7 @@ exports.diacriticsMathMode = {
 //# sourceMappingURL=diacritic.js.map
 
 /***/ }),
-/* 57 */
+/* 58 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5674,14 +6310,14 @@ exports.convertSqrtToUnicode = convertSqrtToUnicode;
 //# sourceMappingURL=sqrt.js.map
 
 /***/ }),
-/* 58 */
+/* 59 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var frac_1 = __webpack_require__(59);
-var binom_1 = __webpack_require__(60);
+var frac_1 = __webpack_require__(60);
+var binom_1 = __webpack_require__(61);
 function expand2argsCommand(name, arg1, arg2) {
     switch (name) {
         case "frac":
@@ -5699,7 +6335,7 @@ exports.expand2argsCommand = expand2argsCommand;
 //# sourceMappingURL=index.js.map
 
 /***/ }),
-/* 59 */
+/* 60 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5750,7 +6386,7 @@ exports.convertFracToUnicode = convertFracToUnicode;
 //# sourceMappingURL=frac.js.map
 
 /***/ }),
-/* 60 */
+/* 61 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5767,13 +6403,13 @@ exports.convertBinom = convertBinom;
 //# sourceMappingURL=binom.js.map
 
 /***/ }),
-/* 61 */
+/* 62 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var frac_1 = __webpack_require__(62);
+var frac_1 = __webpack_require__(63);
 exports.twoArgsCommands = Object.assign({}, frac_1.fracCmds, {
     "binom": true
 });
@@ -5784,7 +6420,7 @@ exports.is2argsCommand = is2argsCommand;
 //# sourceMappingURL=index.js.map
 
 /***/ }),
-/* 62 */
+/* 63 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5804,7 +6440,7 @@ exports.isFracCmd = isFracCmd;
 //# sourceMappingURL=frac.js.map
 
 /***/ }),
-/* 63 */
+/* 64 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5821,7 +6457,7 @@ exports.createKnownCommand = createKnownCommand;
 //# sourceMappingURL=KnownCommand0Args.js.map
 
 /***/ }),
-/* 64 */
+/* 65 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

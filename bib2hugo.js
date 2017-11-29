@@ -32,7 +32,18 @@ if ( process.argv[4] ) {
 
 var params = Object.assign({}, {
     pdfLink: 'pdf',
-    pptLink: 'presentation'
+    pptLink: 'presentation',
+    typeMap: {
+        article: '0',
+        incollection: '1',
+        inproceedings: '2',
+        phdthesis: '3',
+        mastersthesis: '4',
+        proceedings: '5',
+        book: '6',
+        techreport: '7',
+        misc: '8'
+    }
 }, config);
 
 
@@ -179,7 +190,6 @@ bib.forEach(function(entry) {
             // if there is no "pages" for a conference paper, there'd better be an explanation
             output += entry.entryTags.note + '"\n';
         }
-        output += 'publication_types = ["2"]\n';
 
 
     } else if ( type == 'article' ) {
@@ -189,18 +199,12 @@ bib.forEach(function(entry) {
                   // html entities for left/right parens to avoid incorrect markdownification
                   (entry.entryTags.number ? '&#40;' + str(entry.entryTags.number) + '&#41;' : '' ) + ':' +
                   str(entry.entryTags.pages) + '"\n';
-        output += 'publication_types = ["0"]\n';
 
 
     } else if ( type == 'incollection' ) {
         output += 'publication = "' +
                   str(entry.entryTags.booktitle) + ', ' +
                   'Page' + pagePlural + ' ' + str(entry.entryTags.pages) + '"\n';
-        output += 'publication_types = ["1"]\n';
-
-
-    } else if ( type == 'proceedings' ) {
-        output += 'publication_types = ["5"]\n';
 
 
     } else if ( type == 'book' ) {
@@ -209,23 +213,10 @@ bib.forEach(function(entry) {
                   str(entry.entryTags.volume) +
                   // html entities for left/right parens to avoid incorrect markdownification
                   (entry.entryTags.number ? '&#40;' + str(entry.entryTags.number) + '&#41;' : '' ) + '"\n';
-        output += 'publication_types = ["6"]\n';
-
-    } else if ( type == 'techreport' ) {
-        output += 'publication_types = ["7"]\n';
-
-
-    } else if ( type == 'mastersthesis' ) {
-        output += 'publication_types = ["4"]\n';
-
-
-    } else if ( type == 'phdthesis' ) {
-        output += 'publication_types = ["3"]\n';
-
-
-    } else if ( type == 'misc' ) {
-        output += 'publication_types = ["8"]\n';
     }
+
+    var index = params.typeMap[type] || params.typeMap['misc'] || '0';
+    output += 'publication_types = ["' + index + '"]\n';
 
 
     // BiBTeX OUTPUT

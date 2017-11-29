@@ -4,5 +4,10 @@
     "pptFolder": "path/to/presentations, optional",
     "pptLink": "link to presentations, like above (default: 'presentation')",
     "blacklist": ["array", "of", "blacklisted", "bib", "keys"],
-    "whitelist": ["array", "of", "whitelisted", "bib", "keys"]
+    "whitelist": ["array", "of", "whitelisted", "bib", "keys"],
+    "typeMap": {
+        "article": "0",
+        "inproceedings": "1",
+        "and so on for any bibtex entry type": "2"
+    }
 }
