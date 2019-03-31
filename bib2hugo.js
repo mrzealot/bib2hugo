@@ -156,7 +156,7 @@ bib.forEach(function(entry) {
     // LINKS
 
     if ( entry.entryTags.url ) {
-        output += 'url_custom = [{name = "Online", url = "' + entry.entryTags.url + '"}]\n';
+        output += 'links = [{name = "Online", url = "' + entry.entryTags.url + '"}]\n';
     }
 
     if ( params.pdfFolder ) {

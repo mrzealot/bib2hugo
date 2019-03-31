@@ -7,7 +7,7 @@
 		exports["bib2hugo"] = factory();
 	else
 		root["bib2hugo"] = factory();
-})(this, function() {
+})(global, function() {
 return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
 /******/ 	var installedModules = {};
@@ -46,12 +46,32 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// define getter function for harmony exports
 /******/ 	__webpack_require__.d = function(exports, name, getter) {
 /******/ 		if(!__webpack_require__.o(exports, name)) {
-/******/ 			Object.defineProperty(exports, name, {
-/******/ 				configurable: false,
-/******/ 				enumerable: true,
-/******/ 				get: getter
-/******/ 			});
+/******/ 			Object.defineProperty(exports, name, { enumerable: true, get: getter });
 /******/ 		}
+/******/ 	};
+/******/
+/******/ 	// define __esModule on exports
+/******/ 	__webpack_require__.r = function(exports) {
+/******/ 		if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 			Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 		}
+/******/ 		Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 	};
+/******/
+/******/ 	// create a fake namespace object
+/******/ 	// mode & 1: value is a module id, require it
+/******/ 	// mode & 2: merge all properties of value into the ns
+/******/ 	// mode & 4: return value when already ns object
+/******/ 	// mode & 8|1: behave like require
+/******/ 	__webpack_require__.t = function(value, mode) {
+/******/ 		if(mode & 1) value = __webpack_require__(value);
+/******/ 		if(mode & 8) return value;
+/******/ 		if((mode & 4) && typeof value === 'object' && value && value.__esModule) return value;
+/******/ 		var ns = Object.create(null);
+/******/ 		__webpack_require__.r(ns);
+/******/ 		Object.defineProperty(ns, 'default', { enumerable: true, value: value });
+/******/ 		if(mode & 2 && typeof value != 'string') for(var key in value) __webpack_require__.d(ns, key, function(key) { return value[key]; }.bind(null, key));
+/******/ 		return ns;
 /******/ 	};
 /******/
 /******/ 	// getDefaultExport function for compatibility with non-harmony modules
@@ -69,6410 +89,801 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// __webpack_public_path__
 /******/ 	__webpack_require__.p = "";
 /******/
+/******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 14);
+/******/ 	return __webpack_require__(__webpack_require__.s = "./bib2hugo.js");
 /******/ })
 /************************************************************************/
-/******/ ([
-/* 0 */
+/******/ ({
+
+/***/ "./bib2hugo.js":
+/*!*********************!*\
+  !*** ./bib2hugo.js ***!
+  \*********************/
+/*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-function lookupOrAppend(conversionTable, _default_append) {
-    return function (string) {
-        if (conversionTable.hasOwnProperty(string))
-            return conversionTable[string];
-        if (!_default_append)
-            throw new Error("I do not know how to modify the following string: "
-                + string +
-                ". "
-                + "Change your TeX file or submit a feature request at "
-                + "https://github.com/digitalheir/tex-to-unicode/issues.");
-        return string + _default_append;
-    };
-}
-exports.lookupOrAppend = lookupOrAppend;
-//# sourceMappingURL=command-expander.js.map
+eval("\n\nvar fs = __webpack_require__(/*! fs */ \"fs\");\nvar path = __webpack_require__(/*! path */ \"path\");\nvar bibtex = __webpack_require__(/*! bibtex-parse-js */ \"./node_modules/bibtex-parse-js/bibtexParse.js\");\nvar converter = __webpack_require__(/*! latex-to-unicode-converter */ \"./node_modules/latex-to-unicode-converter/index.js\");\n\n//\n// ARGS\n//\n\nif (process.argv.length < 4) {\n    console.error('Usage: bib2hugo inputBib outputFolder [configJSON]');\n    process.exit();\n}\n\nvar input = process.argv[2];\nvar outputFolder = process.argv[3];\n\ntry {\n    fs.accessSync(outputFolder);\n} catch (e) {\n    fs.mkdirSync(outputFolder);\n}\n\nvar config = {};\nif (process.argv[4]) {\n    try {\n        config = JSON.parse(fs.readFileSync(process.argv[4]).toString());\n    } catch (e) {\n        console.log('Unable to open config file <' + process.argv[4] + '>, continuing with defaults...');\n    }\n}\n\nvar params = Object.assign({}, {\n    pdfLink: 'pdf',\n    pptLink: 'presentation',\n    typeMap: {\n        article: '0',\n        incollection: '1',\n        inproceedings: '2',\n        phdthesis: '3',\n        mastersthesis: '4',\n        proceedings: '5',\n        book: '6',\n        techreport: '7',\n        misc: '8'\n    }\n}, config);\n\n//\n// SHARED STUFF\n//\n\nfunction convert(val) {\n    return converter.convertLaTeX({\n        onError: function onError(error, latex) {\n            return latex;\n        }\n    }, val);\n}\n\nfunction str(val) {\n    var ret = val || '';\n    ret = ret.replace(/\\\\&/g, '&');\n    ret = ret.replace(/\\\\%/g, '%');\n    ret = ret.replace(/\\\\#/g, '#');\n    ret = ret.replace(/--/g, '–');\n    ret = convert(ret);\n    return ret;\n}\n\nfunction authorize(name) {\n    return str(name.split(',').map(function (e) {\n        return e.trim();\n    }).reverse().join(' '));\n}\n\nfunction abstractize(val) {\n    return str(val).replace(/(?:\\r\\n|\\r|\\n)/g, '<br />').replace(/\"/g, '\\\\\"');\n}\n\nfunction findFile(folder, needle) {\n    var pattern = new RegExp('^(.*[^a-zA-z0-9])?' + needle + '([^a-zA-Z0-9].*)?$');\n    var result = null;\n    try {\n        fs.readdirSync(folder).forEach(function (file) {\n            if (file.match(pattern)) {\n                result = file;\n                return false;\n            }\n        });\n    } catch (e) {\n        console.error('Unable to open folder <' + folder + '>');\n    }\n    return result;\n}\n\nvar months = {\n    'jan': '01',\n    'feb': '02',\n    'mar': '03',\n    'apr': '04',\n    'may': '05',\n    'jun': '06',\n    'jul': '07',\n    'aug': '08',\n    'sep': '09',\n    'oct': '10',\n    'nov': '11',\n    'dec': '12'\n\n    //\n    // PROCESSING\n    //\n\n};var bib = bibtex.toJSON(fs.readFileSync(input).toString());\nvar count = 0;\n\nbib.forEach(function (entry) {\n\n    var key = entry.citationKey;\n    var type = entry.entryType.toLowerCase();\n\n    // FILTERING\n\n    if (type == 'comment') return;\n\n    if (params.whitelist && params.whitelist.indexOf(key) === -1) {\n        console.log('Whitelist filtered: ' + key);\n        return;\n    }\n\n    if (params.blacklist && params.blacklist.indexOf(key) !== -1) {\n        console.log('Blacklist filtered: ' + key);\n        return;\n    }\n\n    console.log('Processing: ' + key);\n    count++;\n\n    // BASIC OUTPUT\n\n    var output = \"+++\\n\";\n    output += 'title = \"' + str(entry.entryTags.title) + '\"\\n';\n    var authorField = type == 'book' || type == 'proceedings' ? 'editor' : 'author';\n    var authors = entry.entryTags[authorField].split('and').map(function (name) {\n        return authorize(name);\n    });\n    output += 'authors = ' + JSON.stringify(authors) + '\\n';\n    output += 'abstract = \"' + abstractize(entry.entryTags.abstract || '') + '\"\\n';\n    output += 'date = \"' + entry.entryTags.year + '-' + (months[entry.entryTags.month] || '01') + '-01\"\\n';\n\n    // LINKS\n\n    if (entry.entryTags.url) {\n        output += 'links = [{name = \"Online\", url = \"' + entry.entryTags.url + '\"}]\\n';\n    }\n\n    if (params.pdfFolder) {\n        var pdf = findFile(params.pdfFolder, key);\n        if (pdf) {\n            console.log('PDF link: ' + pdf);\n            output += 'url_pdf = \"' + params.pdfLink + '/' + pdf + '\"\\n';\n        }\n    }\n\n    if (params.pptFolder) {\n        var ppt = findFile(params.pptFolder, key);\n        if (ppt) {\n            console.log('PPT link: ' + ppt);\n            output += 'url_slides = \"' + params.pptLink + '/' + ppt + '\"\\n';\n        }\n    }\n\n    // TYPE DEPENDENT OUTPUT\n\n    var pagePlural = entry.entryTags.pages && entry.entryTags.pages.indexOf('-') !== -1 ? 's' : '';\n\n    if (type == 'inproceedings') {\n        output += 'publication = \"' + str(entry.entryTags.booktitle) + ', ' + str(entry.entryTags.address) + ', ';\n        if (entry.entryTags.pages) {\n            output += 'Page' + pagePlural + ' ' + str(entry.entryTags.pages) + '\"\\n';\n        } else {\n            // if there is no \"pages\" for a conference paper, there'd better be an explanation\n            output += entry.entryTags.note + '\"\\n';\n        }\n    } else if (type == 'article') {\n        output += 'publication = \"' + str(entry.entryTags.journal) + ', ' + str(entry.entryTags.volume) + (\n        // html entities for left/right parens to avoid incorrect markdownification\n        entry.entryTags.number ? '&#40;' + str(entry.entryTags.number) + '&#41;' : '') + ':' + str(entry.entryTags.pages) + '\"\\n';\n    } else if (type == 'incollection') {\n        output += 'publication = \"' + str(entry.entryTags.booktitle) + ', ' + 'Page' + pagePlural + ' ' + str(entry.entryTags.pages) + '\"\\n';\n    } else if (type == 'book') {\n        output += 'publication = \"' + str(entry.entryTags.series) + ', ' + str(entry.entryTags.volume) + (\n        // html entities for left/right parens to avoid incorrect markdownification\n        entry.entryTags.number ? '&#40;' + str(entry.entryTags.number) + '&#41;' : '') + '\"\\n';\n    }\n\n    var index = params.typeMap[type] || params.typeMap['misc'] || '0';\n    output += 'publication_types = [\"' + index + '\"]\\n';\n\n    // BiBTeX OUTPUT\n\n    var max = Object.keys(entry.entryTags).reduce(function (a, b) {\n        return Math.max(a, b.length);\n    }, 0);\n\n    output += '+++\\n\\n';\n    output += 'BibTeX:\\n';\n    output += '```tex\\n';\n    output += '@' + entry.entryType + '{' + key + ',\\n';\n    Object.keys(entry.entryTags).forEach(function (field) {\n        if (field == 'abstract') return;\n        if (field == 'month') {\n            output += '    ' + field.padEnd(max + 1) + '= ' + entry.entryTags[field] + ',\\n';\n        } else {\n            output += '    ' + field.padEnd(max + 1) + '= {' + entry.entryTags[field] + '},\\n';\n        }\n    });\n    output += '}\\n';\n    output += '```\\n';\n\n    // DONE\n\n    fs.writeFileSync(path.join(outputFolder, key + '.md'), output);\n});\n\nconsole.log('Done, processed ' + count + ' entries.');\n\n//# sourceURL=webpack://bib2hugo/./bib2hugo.js?");
 
 /***/ }),
-/* 1 */
+
+/***/ "./node_modules/bibtex-parse-js/bibtexParse.js":
+/*!*****************************************************!*\
+  !*** ./node_modules/bibtex-parse-js/bibtexParse.js ***!
+  \*****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("/* start bibtexParse 0.0.24 */\n\n//Original work by Henrik Muehe (c) 2010\n//\n//CommonJS port by Mikola Lysenko 2013\n//\n//Port to Browser lib by ORCID / RCPETERS\n//\n//Issues:\n//no comment handling within strings\n//no string concatenation\n//no variable values yet\n//Grammar implemented here:\n//bibtex -> (string | preamble | comment | entry)*;\n//string -> '@STRING' '{' key_equals_value '}';\n//preamble -> '@PREAMBLE' '{' value '}';\n//comment -> '@COMMENT' '{' value '}';\n//entry -> '@' key '{' key ',' key_value_list '}';\n//key_value_list -> key_equals_value (',' key_equals_value)*;\n//key_equals_value -> key '=' value;\n//value -> value_quotes | value_braces | key;\n//value_quotes -> '\"' .*? '\"'; // not quite\n//value_braces -> '{' .*? '\"'; // not quite\n(function(exports) {\n\n    function BibtexParser() {\n\n        this.months = [\"jan\", \"feb\", \"mar\", \"apr\", \"may\", \"jun\", \"jul\", \"aug\", \"sep\", \"oct\", \"nov\", \"dec\"];\n        this.notKey = [',','{','}',' ','='];\n        this.pos = 0;\n        this.input = \"\";\n        this.entries = new Array();\n\n        this.currentEntry = \"\";\n\n        this.setInput = function(t) {\n            this.input = t;\n        };\n\n        this.getEntries = function() {\n            return this.entries;\n        };\n\n        this.isWhitespace = function(s) {\n            return (s == ' ' || s == '\\r' || s == '\\t' || s == '\\n');\n        };\n\n        this.match = function(s, canCommentOut) {\n            if (canCommentOut == undefined || canCommentOut == null)\n                canCommentOut = true;\n            this.skipWhitespace(canCommentOut);\n            if (this.input.substring(this.pos, this.pos + s.length) == s) {\n                this.pos += s.length;\n            } else {\n                throw \"Token mismatch, expected \" + s + \", found \"\n                        + this.input.substring(this.pos);\n            };\n            this.skipWhitespace(canCommentOut);\n        };\n\n        this.tryMatch = function(s, canCommentOut) {\n            if (canCommentOut == undefined || canCommentOut == null)\n                canCommentOut = true;\n            this.skipWhitespace(canCommentOut);\n            if (this.input.substring(this.pos, this.pos + s.length) == s) {\n                return true;\n            } else {\n                return false;\n            };\n            this.skipWhitespace(canCommentOut);\n        };\n\n        /* when search for a match all text can be ignored, not just white space */\n        this.matchAt = function() {\n            while (this.input.length > this.pos && this.input[this.pos] != '@') {\n                this.pos++;\n            };\n\n            if (this.input[this.pos] == '@') {\n                return true;\n            };\n            return false;\n        };\n\n        this.skipWhitespace = function(canCommentOut) {\n            while (this.isWhitespace(this.input[this.pos])) {\n                this.pos++;\n            };\n            if (this.input[this.pos] == \"%\" && canCommentOut == true) {\n                while (this.input[this.pos] != \"\\n\") {\n                    this.pos++;\n                };\n                this.skipWhitespace(canCommentOut);\n            };\n        };\n\n        this.value_braces = function() {\n            var bracecount = 0;\n            this.match(\"{\", false);\n            var start = this.pos;\n            var escaped = false;\n            while (true) {\n                if (!escaped) {\n                    if (this.input[this.pos] == '}') {\n                        if (bracecount > 0) {\n                            bracecount--;\n                        } else {\n                            var end = this.pos;\n                            this.match(\"}\", false);\n                            return this.input.substring(start, end);\n                        };\n                    } else if (this.input[this.pos] == '{') {\n                        bracecount++;\n                    } else if (this.pos >= this.input.length - 1) {\n                        throw \"Unterminated value\";\n                    };\n                };\n                if (this.input[this.pos] == '\\\\' && escaped == false)\n                    escaped = true;\n                else\n                    escaped = false;\n                this.pos++;\n            };\n        };\n\n        this.value_comment = function() {\n            var str = '';\n            var brcktCnt = 0;\n            while (!(this.tryMatch(\"}\", false) && brcktCnt == 0)) {\n                str = str + this.input[this.pos];\n                if (this.input[this.pos] == '{')\n                    brcktCnt++;\n                if (this.input[this.pos] == '}')\n                    brcktCnt--;\n                if (this.pos >= this.input.length - 1) {\n                    throw \"Unterminated value:\" + this.input.substring(start);\n                };\n                this.pos++;\n            };\n            return str;\n        };\n\n        this.value_quotes = function() {\n            this.match('\"', false);\n            var start = this.pos;\n            var escaped = false;\n            while (true) {\n                if (!escaped) {\n                    if (this.input[this.pos] == '\"') {\n                        var end = this.pos;\n                        this.match('\"', false);\n                        return this.input.substring(start, end);\n                    } else if (this.pos >= this.input.length - 1) {\n                        throw \"Unterminated value:\" + this.input.substring(start);\n                    };\n                }\n                if (this.input[this.pos] == '\\\\' && escaped == false)\n                    escaped = true;\n                else\n                    escaped = false;\n                this.pos++;\n            };\n        };\n\n        this.single_value = function() {\n            var start = this.pos;\n            if (this.tryMatch(\"{\")) {\n                return this.value_braces();\n            } else if (this.tryMatch('\"')) {\n                return this.value_quotes();\n            } else {\n                var k = this.key();\n                if (k.match(\"^[0-9]+$\"))\n                    return k;\n                else if (this.months.indexOf(k.toLowerCase()) >= 0)\n                    return k.toLowerCase();\n                else\n                    throw \"Value expected:\" + this.input.substring(start) + ' for key: ' + k;\n\n            };\n        };\n\n        this.value = function() {\n            var values = [];\n            values.push(this.single_value());\n            while (this.tryMatch(\"#\")) {\n                this.match(\"#\");\n                values.push(this.single_value());\n            };\n            return values.join(\"\");\n        };\n\n        this.key = function(optional) {\n            var start = this.pos;\n            while (true) {\n                if (this.pos >= this.input.length) {\n                    throw \"Runaway key\";\n                };\n                                // а-яА-Я is Cyrillic\n                //console.log(this.input[this.pos]);\n                if (this.notKey.indexOf(this.input[this.pos]) >= 0) {\n                    if (optional && this.input[this.pos] != ',') {\n                        this.pos = start;\n                        return null;\n                    };\n                    return this.input.substring(start, this.pos);\n                } else {\n                    this.pos++;\n\n                };\n            };\n        };\n\n        this.key_equals_value = function() {\n            var key = this.key();\n            if (this.tryMatch(\"=\")) {\n                this.match(\"=\");\n                var val = this.value();\n                key = key.trim()\n                return [ key, val ];\n            } else {\n                throw \"... = value expected, equals sign missing:\"\n                        + this.input.substring(this.pos);\n            };\n        };\n\n        this.key_value_list = function() {\n            var kv = this.key_equals_value();\n            this.currentEntry['entryTags'] = {};\n            this.currentEntry['entryTags'][kv[0]] = kv[1];\n            while (this.tryMatch(\",\")) {\n                this.match(\",\");\n                // fixes problems with commas at the end of a list\n                if (this.tryMatch(\"}\")) {\n                    break;\n                }\n                ;\n                kv = this.key_equals_value();\n                this.currentEntry['entryTags'][kv[0]] = kv[1];\n            };\n        };\n\n        this.entry_body = function(d) {\n            this.currentEntry = {};\n            this.currentEntry['citationKey'] = this.key(true);\n            this.currentEntry['entryType'] = d.substring(1);\n            if (this.currentEntry['citationKey'] != null) {\n                this.match(\",\");\n            }\n            this.key_value_list();\n            this.entries.push(this.currentEntry);\n        };\n\n        this.directive = function() {\n            this.match(\"@\");\n            return \"@\" + this.key();\n        };\n\n        this.preamble = function() {\n            this.currentEntry = {};\n            this.currentEntry['entryType'] = 'PREAMBLE';\n            this.currentEntry['entry'] = this.value_comment();\n            this.entries.push(this.currentEntry);\n        };\n\n        this.comment = function() {\n            this.currentEntry = {};\n            this.currentEntry['entryType'] = 'COMMENT';\n            this.currentEntry['entry'] = this.value_comment();\n            this.entries.push(this.currentEntry);\n        };\n\n        this.entry = function(d) {\n            this.entry_body(d);\n        };\n\n        this.alernativeCitationKey = function () {\n            this.entries.forEach(function (entry) {\n                if (!entry.citationKey && entry.entryTags) {\n                    entry.citationKey = '';\n                    if (entry.entryTags.author) {\n                        entry.citationKey += entry.entryTags.author.split(',')[0] += ', ';\n                    }\n                    entry.citationKey += entry.entryTags.year;\n                }\n            });\n        }\n\n        this.bibtex = function() {\n            while (this.matchAt()) {\n                var d = this.directive();\n                this.match(\"{\");\n                if (d.toUpperCase() == \"@STRING\") {\n                    this.string();\n                } else if (d.toUpperCase() == \"@PREAMBLE\") {\n                    this.preamble();\n                } else if (d.toUpperCase() == \"@COMMENT\") {\n                    this.comment();\n                } else {\n                    this.entry(d);\n                }\n                this.match(\"}\");\n            };\n\n            this.alernativeCitationKey();\n        };\n    };\n\n    exports.toJSON = function(bibtex) {\n        var b = new BibtexParser();\n        b.setInput(bibtex);\n        b.bibtex();\n        return b.entries;\n    };\n\n    /* added during hackathon don't hate on me */\n    exports.toBibtex = function(json) {\n        var out = '';\n        for ( var i in json) {\n            out += \"@\" + json[i].entryType;\n            out += '{';\n            if (json[i].citationKey)\n                out += json[i].citationKey + ', ';\n            if (json[i].entry)\n                out += json[i].entry ;\n            if (json[i].entryTags) {\n                var tags = '';\n                for (var jdx in json[i].entryTags) {\n                    if (tags.length != 0)\n                        tags += ', ';\n                    tags += jdx + '= {' + json[i].entryTags[jdx] + '}';\n                }\n                out += tags;\n            }\n            out += '}\\n\\n';\n        }\n        return out;\n\n    };\n\n})( false ? undefined : exports);\n\n/* end bibtexParse */\n\n\n//# sourceURL=webpack://bib2hugo/./node_modules/bibtex-parse-js/bibtexParse.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-parser/main.js":
+/*!*******************************************!*\
+  !*** ./node_modules/latex-parser/main.js ***!
+  \*******************************************/
+/*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.simpleSuffix = function (modifier) {
-    return function (char) {
-        return char + modifier;
-    };
-};
-exports.isSingleTerm = /^.$|^[0-9]+$/;
-function addParenthesis(n) {
-    return "(" + n + ")";
-}
-exports.addParenthesis = addParenthesis;
-//# sourceMappingURL=util.js.map
+eval("\r\nfunction __export(m) {\r\n    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];\r\n}\r\nObject.defineProperty(exports, \"__esModule\", { value: true });\r\n__export(__webpack_require__(/*! ./ts-compiled/Utils */ \"./node_modules/latex-parser/ts-compiled/Utils.js\"));\r\n__export(__webpack_require__(/*! ./ts-compiled/Text/LaTeX/Base/Syntax */ \"./node_modules/latex-parser/ts-compiled/Text/LaTeX/Base/Syntax.js\"));\r\n__export(__webpack_require__(/*! ./ts-compiled/Text/LaTeX/Base/Parser */ \"./node_modules/latex-parser/ts-compiled/Text/LaTeX/Base/Parser.js\"));\r\n//# sourceMappingURL=main.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-parser/main.js?");
 
 /***/ }),
-/* 2 */
+
+/***/ "./node_modules/latex-parser/ts-compiled/Text/LaTeX/Base/Parser.js":
+/*!*************************************************************************!*\
+  !*** ./node_modules/latex-parser/ts-compiled/Text/LaTeX/Base/Parser.js ***!
+  \*************************************************************************/
+/*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-function updateProperties(target, values, opt_keys, opt_attributes) {
-    if (opt_attributes === void 0) { opt_attributes = {
-        writable: true,
-        enumerable: true,
-        configurable: true
-    }; }
-    if (!(target instanceof Object))
-        throw new TypeError('"target" isn\'t an Object instance');
-    if (values === undefined)
-        return;
-    if (!(values instanceof Object))
-        throw new TypeError('"properties" isn\'t an Object instance');
-    if (opt_attributes === undefined) {
-        opt_attributes = { writable: true, enumerable: true, configurable: true };
-    }
-    else if (!(opt_attributes instanceof Object)) {
-        throw new TypeError('"attributes" isn\'t an Object instance');
-    }
-    if (opt_keys === undefined) {
-        for (var key in values) {
-            if (values[key] !== undefined) {
-                Object.defineProperty(target, key, Object.create(opt_attributes, { value: { value: values[key] } }));
-            }
-        }
-    }
-    else if (opt_keys instanceof Array) {
-        opt_keys.forEach(function (key) {
-            if (values[key] !== undefined) {
-                Object.defineProperty(target, key, Object.create(opt_attributes, { value: { value: values[key] } }));
-            }
-        });
-    }
-    else if (opt_keys instanceof Object) {
-        for (var targetKey in opt_keys) {
-            var key = opt_keys[targetKey];
-            if (values[key] !== undefined)
-                Object.defineProperty(target, targetKey, Object.create(opt_attributes, { value: { value: values[key] } }));
-        }
-    }
-    else {
-        throw new TypeError('"keys" isn\'t an Object instance');
-    }
-}
-exports.updateProperties = updateProperties;
-function testProperties(target, values, opt_keys, opt_skipUndefined) {
-    if (opt_skipUndefined === void 0) { opt_skipUndefined = true; }
-    if (!(target instanceof Object))
-        throw new TypeError('"target" isn\'t an Object instance');
-    if (values === undefined)
-        return true;
-    if (!(values instanceof Object))
-        throw new TypeError('"properties" isn\'t an Object instance');
-    if (opt_skipUndefined === undefined)
-        opt_skipUndefined = true;
-    if (opt_keys === undefined) {
-        for (var key in values) {
-            if (target[key] !== values[key]
-                && !(values[key] === undefined && opt_skipUndefined))
-                return false;
-        }
-    }
-    else if (opt_keys instanceof Array) {
-        return opt_keys.every(function (key) {
-            return target[key] === values[key] || (values[key] === undefined && opt_skipUndefined);
-        });
-    }
-    else if (opt_keys instanceof Object) {
-        for (var targetKey in opt_keys) {
-            var key = opt_keys[targetKey];
-            if (target[targetKey] !== values[key] && !(values[key] === undefined && opt_skipUndefined))
-                return false;
-        }
-    }
-    else {
-        throw new TypeError('"keys" isn\'t an Object instance');
-    }
-    return true;
-}
-exports.testProperties = testProperties;
-exports.mustBeNumber = function (a, msg) {
-    if (!(isNumber(a)))
-        throw new TypeError(msg ? msg : "Expected number");
-    return a;
-};
-function isNumber(x) {
-    return typeof x === "number";
-}
-exports.isNumber = isNumber;
-function isString(x) {
-    return typeof x === "string";
-}
-exports.isString = isString;
-function mustNotBeUndefined(x, msg) {
-    if (!x)
-        throw new Error(msg);
-    return x;
-}
-exports.mustNotBeUndefined = mustNotBeUndefined;
-function mustBeObject(o, msg) {
-    if (!(o instanceof Object))
-        throw new TypeError(msg ? msg : "Expected Object");
-    return o;
-}
-exports.mustBeObject = mustBeObject;
-function mustBeString(o, msg) {
-    if (typeof o !== "string")
-        throw new TypeError(msg ? msg : "Expected string");
-    return o;
-}
-exports.mustBeString = mustBeString;
-function mustBeArray(a, msg) {
-    if (!(isArray(a)))
-        throw new TypeError(msg ? msg : "Expected Array");
-    return a;
-}
-exports.mustBeArray = mustBeArray;
-function isArray(x) {
-    return !!x && x.constructor === Array;
-}
-exports.isArray = isArray;
-exports.mconcat = function (mappend) {
-    var args = [];
-    for (var _i = 1; _i < arguments.length; _i++) {
-        args[_i - 1] = arguments[_i];
-    }
-    return args.reduceRight(mappend);
-};
-exports.snd = function (pair) { return pair[1]; };
-function concatMap(arr, f) {
-    return [].concat.apply([], arr.map(f));
-}
-exports.concatMap = concatMap;
-//# sourceMappingURL=Utils.js.map
+eval("\r\nObject.defineProperty(exports, \"__esModule\", { value: true });\r\nvar parsimmon_1 = __webpack_require__(/*! parsimmon */ \"./node_modules/parsimmon/src/parsimmon.js\");\r\nvar Syntax_1 = __webpack_require__(/*! ./Syntax */ \"./node_modules/latex-parser/ts-compiled/Text/LaTeX/Base/Syntax.js\");\r\nvar Syntax_2 = __webpack_require__(/*! ./Syntax */ \"./node_modules/latex-parser/ts-compiled/Text/LaTeX/Base/Syntax.js\");\r\nvar Utils_1 = __webpack_require__(/*! ../../../Utils */ \"./node_modules/latex-parser/ts-compiled/Utils.js\");\r\nvar parsimmon_2 = __webpack_require__(/*! parsimmon */ \"./node_modules/parsimmon/src/parsimmon.js\");\r\nexports.defaultParserConf = {\r\n    verbatimEnvironments: [\"verbatim\"]\r\n};\r\nexports.takeTill = function (predicate) { return parsimmon_1.takeWhile(function (c) { return !predicate(c); }); };\r\nvar takeTillNewline = parsimmon_1.regexp(/[^\\n]*/);\r\nvar maybeNewline = parsimmon_1.regexp(/\\n?/);\r\nvar whitespace = parsimmon_1.regexp(/\\s*/m);\r\nvar commentSymbol = parsimmon_1.string(\"%\");\r\nfunction unsafeUnion(xs, ys) {\r\n    var xn = xs.length;\r\n    var yn = ys.length;\r\n    if (xn === 0) {\r\n        return ys;\r\n    }\r\n    else if (yn === 0) {\r\n        return xs;\r\n    }\r\n    var obj = {};\r\n    for (var i = 0; i < xn; i++) {\r\n        obj[xs[i]] = true;\r\n    }\r\n    for (var j = 0; j < yn; j++) {\r\n        obj[ys[j]] = true;\r\n    }\r\n    var keys = [];\r\n    for (var k in obj) {\r\n        if (obj.hasOwnProperty(k)) {\r\n            keys.push(k);\r\n        }\r\n    }\r\n    keys.sort();\r\n    return keys;\r\n}\r\nfunction mergeReplies(result, last) {\r\n    if (!last) {\r\n        return result;\r\n    }\r\n    if (result.furthest > last.furthest) {\r\n        return result;\r\n    }\r\n    var expected = (result.furthest === last.furthest)\r\n        ? unsafeUnion(result.expected, last.expected)\r\n        : last.expected;\r\n    return {\r\n        status: result.status,\r\n        index: result.index,\r\n        value: result.value,\r\n        furthest: last.furthest,\r\n        expected: expected\r\n    };\r\n}\r\nfunction manyTillAndMap(manyOf, till, map, initial) {\r\n    return parsimmon_1.Parser(function (input, i) {\r\n        var accum = initial;\r\n        var j = 0;\r\n        var result = undefined;\r\n        while (i < input.length) {\r\n            var endCodonFound = till._(input, i);\r\n            if (endCodonFound.status) {\r\n                i = Utils_1.mustBeNumber(endCodonFound.index);\r\n                break;\r\n            }\r\n            var bigParse = manyOf._(input, i);\r\n            if (isNotOk(bigParse))\r\n                return bigParse;\r\n            result = Utils_1.mustNotBeUndefined(mergeReplies(bigParse, result));\r\n            if (isNotOk(result)) {\r\n                return result;\r\n            }\r\n            j++;\r\n            var value = Utils_1.mustNotBeUndefined(result.value);\r\n            accum = map(accum, value);\r\n            i = Utils_1.mustBeNumber(result.index);\r\n        }\r\n        var result2 = parsimmon_1.makeSuccess(i, accum);\r\n        return mustBeOk(mergeReplies(result2, result));\r\n    });\r\n}\r\nfunction manyTill(manyOf, till) {\r\n    return manyTillAndMap(manyOf, till, function (a, el) { return a.concat([el]); }, []);\r\n}\r\nfunction token(parser) {\r\n    return parser.skip(whitespace);\r\n}\r\nfunction word(str) {\r\n    return parsimmon_1.string(str).thru(token);\r\n}\r\nvar lbrace = \"{\";\r\nvar rbrace = \"}\";\r\nvar lbracket = \"[\";\r\nvar rbracket = \"]\";\r\nvar comma = \",\";\r\nvar colon = \":\";\r\nvar openingBracket = parsimmon_1.string(lbracket);\r\nvar closingBracket = parsimmon_1.string(rbracket);\r\nvar isClosingbracket = function (str) { return str === (rbracket); };\r\nexports.notTextDefault = {\r\n    \"$\": true,\r\n    \"%\": true,\r\n    \"\\\\\": true,\r\n    \"{\": true,\r\n    \"]\": true,\r\n    \"}\": true\r\n};\r\nexports.notTextMathMode = {\r\n    \"^\": true,\r\n    \"_\": true,\r\n    \"$\": true,\r\n    \"%\": true,\r\n    \"\\\\\": true,\r\n    \"{\": true,\r\n    \"]\": true,\r\n    \"}\": true\r\n};\r\nexports.notTextMathModeAndNotClosingBracket = {\r\n    \"^\": true,\r\n    \"_\": true,\r\n    \"$\": true,\r\n    \"%\": true,\r\n    \"\\\\\": true,\r\n    \"{\": true,\r\n    \"}\": true\r\n};\r\nexports.notTextDefaultAndNotClosingBracket = {\r\n    \"$\": true,\r\n    \"%\": true,\r\n    \"\\\\\": true,\r\n    \"{\": true,\r\n    \"}\": true\r\n};\r\nfunction takeAtLeastOneTill(till) {\r\n    return parsimmon_1.Parser(function (str, i) {\r\n        var firstChar = str.charAt(i);\r\n        if (i >= str.length || till(firstChar)) {\r\n            return parsimmon_2.makeFailure(i, \"text character\");\r\n        }\r\n        else {\r\n            var strz = [firstChar];\r\n            i++;\r\n            var char = str.charAt(i);\r\n            while (!till(char) && i < str.length) {\r\n                strz.push(char);\r\n                i++;\r\n                char = str.charAt(i);\r\n            }\r\n            return parsimmon_1.makeSuccess(i, strz.join(\"\"));\r\n        }\r\n    });\r\n}\r\nfunction textParser(notText) {\r\n    return takeAtLeastOneTill(isNotText(notText))\r\n        .map(function (match) { return Syntax_2.newTeXRaw(match); });\r\n}\r\nexports.textParser = textParser;\r\nvar text = textParser(exports.notTextDefault);\r\nvar text2 = textParser(exports.notTextDefaultAndNotClosingBracket);\r\nvar spaces = parsimmon_1.regexp(/ */)\r\n    .map(Syntax_2.newTeXRaw);\r\nexports.comment = commentSymbol\r\n    .then(takeTillNewline)\r\n    .skip(maybeNewline)\r\n    .map(Syntax_1.newTeXComment);\r\nexports.specialCharsDefault = {\r\n    \"'\": true,\r\n    \"(\": true,\r\n    \")\": true,\r\n    \",\": true,\r\n    \".\": true,\r\n    \"-\": true,\r\n    '\"': true,\r\n    \"!\": true,\r\n    \"^\": true,\r\n    \"$\": true,\r\n    \"&\": true,\r\n    \"#\": true,\r\n    \"{\": true,\r\n    \"}\": true,\r\n    \"%\": true,\r\n    \"~\": true,\r\n    \"|\": true,\r\n    \"/\": true,\r\n    \":\": true,\r\n    \";\": true,\r\n    \"=\": true,\r\n    \"[\": true,\r\n    \"]\": true,\r\n    \"\\\\\": true,\r\n    \"`\": true,\r\n    \" \": true\r\n};\r\nfunction isSpecialCharacter(char, specialChars) {\r\n    var chars = specialChars === undefined ? exports.specialCharsDefault : specialChars;\r\n    return chars.hasOwnProperty(char);\r\n}\r\nexports.isSpecialCharacter = isSpecialCharacter;\r\nfunction isNotText(notText) {\r\n    return function (char) { return notText.hasOwnProperty(char); };\r\n}\r\nexports.isNotText = isNotText;\r\nexports.mathSymbol = parsimmon_1.string(\"$\");\r\nexports.commandSymbol = parsimmon_1.string(\"\\\\\");\r\nfunction latexBlockParser(mode, sub, sup) {\r\n    if (sub === void 0) { sub = \"_\"; }\r\n    if (sup === void 0) { sup = \"^\"; }\r\n    switch (mode) {\r\n        case \"Math\":\r\n            return exports.latexBlockParserMathMode(sub, sup);\r\n        default:\r\n            return exports.latexBlockParserTextMode;\r\n    }\r\n}\r\nexports.latexBlockParser = latexBlockParser;\r\nexports.latexBlockParserTextMode = parsimmon_1.lazy(function () { return parsimmon_1.alt(parsimmon_1.alt(textParser(exports.notTextDefault), exports.dolMath, exports.comment, textParser(exports.notTextDefaultAndNotClosingBracket), exports.environment, command(\"Paragraph\"))); });\r\nexports.latexBlockParserMathMode = function (sub, sup) {\r\n    return parsimmon_1.lazy(function () { return parsimmon_1.alt(parsimmon_1.alt(shiftedScript(\"Math\", sub, sup), textParser(exports.notTextMathMode), exports.dolMath, exports.comment, textParser(exports.notTextMathModeAndNotClosingBracket), exports.environment, command(\"Math\"))); });\r\n};\r\nexports.latexParser = exports.latexBlockParserTextMode.many();\r\nvar anonym = parsimmon_1.string(lbrace)\r\n    .then(exports.latexBlockParserTextMode.many())\r\n    .skip(parsimmon_1.string(rbrace));\r\nexports.env = parsimmon_1.Parser(function (input, i) {\r\n    var beginFound = parsimmon_1.string(\"\\\\begin\")\r\n        .then(parsimmon_1.string(lbrace))\r\n        .then(spaces)\r\n        .then(parsimmon_1.regexp(/[a-zA-Z]+/))\r\n        .skip(spaces)\r\n        .skip(parsimmon_1.string(rbrace))\r\n        ._(input, i);\r\n    if (isNotOk(beginFound))\r\n        return beginFound;\r\n    i = Utils_1.mustBeNumber(beginFound.index);\r\n    var envName = beginFound.value;\r\n    return manyTill(exports.latexBlockParserTextMode, parsimmon_1.string(\"\\\\end\")\r\n        .then(parsimmon_1.string(lbrace))\r\n        .then(spaces)\r\n        .then(parsimmon_1.string(envName))\r\n        .then(spaces)\r\n        .then(parsimmon_1.string(rbrace))).map(function (latex) { return Syntax_1.newTeXEnv(envName, latex); })._(input, i);\r\n});\r\nexports.environment = parsimmon_1.alt(anonym, exports.env);\r\nexports.specialChar = parsimmon_1.test(isSpecialCharacter);\r\nfunction isUppercaseAlph(c) {\r\n    return c >= \"A\" && c <= \"Z\";\r\n}\r\nfunction isLowercaseAlph(c) {\r\n    return c >= \"a\" && c <= \"z\";\r\n}\r\nexports.endCmd = function (c) { return !isLowercaseAlph(c) && !isUppercaseAlph(c); };\r\nvar openingBrace = parsimmon_1.string(\"{\");\r\nvar closingBrace = parsimmon_1.string(\"}\");\r\nvar isClosingBrace = function (str) { return str === (\"}\"); };\r\nfunction fixArg(mode) {\r\n    return openingBrace\r\n        .then(manyTill(latexBlockParser(mode, \"_\"), closingBrace)).map(Syntax_1.newFixArg);\r\n}\r\nexports.fixArg = fixArg;\r\nfunction optArg(mode) {\r\n    return openingBracket\r\n        .then(manyTill(latexBlockParser(mode), closingBracket))\r\n        .map(Syntax_1.newOptArg);\r\n}\r\nexports.optArg = optArg;\r\nfunction cmdArg(mode) {\r\n    return parsimmon_1.alt(fixArg(mode), optArg(mode));\r\n}\r\nexports.cmdArg = cmdArg;\r\nfunction cmdArgs(mode) {\r\n    return parsimmon_1.alt(parsimmon_1.string(\"{}\").map(function () { return []; }), cmdArg(mode).map(function (s) { return s; }).atLeast(0)).map(function (e) { return e; });\r\n}\r\nexports.cmdArgs = cmdArgs;\r\nfunction command(mode) {\r\n    return parsimmon_1.seqMap(exports.commandSymbol, parsimmon_1.alt(exports.specialChar, exports.takeTill(exports.endCmd)), cmdArgs(mode), function (ignored, name, argz) {\r\n        return argz !== undefined ? Syntax_1.newTeXComm.apply(void 0, [name].concat(argz)) : Syntax_1.newTeXComm(name);\r\n    }).map(function (res) {\r\n        return res;\r\n    });\r\n}\r\nexports.command = command;\r\nexports.subOrSuperscriptSymbolParser = function (subscriptSymbol, superscriptSymbol) {\r\n    return parsimmon_1.alt(parsimmon_1.string(subscriptSymbol), parsimmon_1.string(superscriptSymbol)).map(function (parsedStr) { return (parsedStr === subscriptSymbol ? Syntax_1.SubOrSuperSymbol.SUB : Syntax_1.SubOrSuperSymbol.SUP); });\r\n};\r\nfunction shiftedScript(mode, sub, sup) {\r\n    return parsimmon_1.seqMap(exports.subOrSuperscriptSymbolParser(sub, sup), cmdArgs(mode), function (symbol, argz) {\r\n        return Syntax_1.newSubOrSuperScript(symbol, symbol === Syntax_1.SubOrSuperSymbol.SUB ? sub : sup, argz);\r\n    }).map(function (res) {\r\n        return res;\r\n    });\r\n}\r\nexports.shiftedScript = shiftedScript;\r\nexports.dolMath = math();\r\nfunction math(mathType, sMath, eMath) {\r\n    if (mathType === void 0) { mathType = \"Dollar\"; }\r\n    if (sMath === void 0) { sMath = \"$\"; }\r\n    if (eMath === void 0) { eMath = \"$\"; }\r\n    return parsimmon_1.string(sMath)\r\n        .then(latexBlockParser(\"Math\", \"_\")\r\n        .many()\r\n        .map(function (str) { return Syntax_1.newTeXMath(mathType, sMath, eMath, str); }))\r\n        .skip(parsimmon_1.string(eMath));\r\n}\r\nfunction isOk(parse) {\r\n    return parse !== undefined && parse.status === true;\r\n}\r\nexports.isOk = isOk;\r\nfunction isNotOk(parse) {\r\n    return parse !== undefined && parse.status === false;\r\n}\r\nexports.isNotOk = isNotOk;\r\nfunction mustBeOk(parse) {\r\n    if (!isOk(parse))\r\n        throw new Error(\"Expected parse to be success: \" + JSON.stringify(parse));\r\n    return parse;\r\n}\r\nexports.mustBeOk = mustBeOk;\r\n//# sourceMappingURL=Parser.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-parser/ts-compiled/Text/LaTeX/Base/Parser.js?");
 
 /***/ }),
-/* 3 */
+
+/***/ "./node_modules/latex-parser/ts-compiled/Text/LaTeX/Base/Syntax.js":
+/*!*************************************************************************!*\
+  !*** ./node_modules/latex-parser/ts-compiled/Text/LaTeX/Base/Syntax.js ***!
+  \*************************************************************************/
+/*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var Utils_1 = __webpack_require__(2);
-var CategoryCode_1 = __webpack_require__(6);
-function isMeasure(x) {
-    return isBuiltInMeasure(x) || isCustomMeasure(x);
-}
-exports.isMeasure = isMeasure;
-exports.measureTypes = {
-    "pt": true,
-    "mm": true,
-    "cm": true,
-    "in": true,
-    "ex": true,
-    "em": true,
-};
-function isMeasureType(x) {
-    return exports.measureTypes.hasOwnProperty(x);
-}
-exports.isMeasureType = isMeasureType;
-function isBuiltInMeasure(x) {
-    return isMeasureType(x.type) && Utils_1.isNumber(x.value);
-}
-exports.isBuiltInMeasure = isBuiltInMeasure;
-function isCustomMeasure(x) {
-    return isLaTeXBlock(x.expression);
-}
-exports.isCustomMeasure = isCustomMeasure;
-exports.mathTypes = {
-    Parentheses: "Parentheses",
-    Square: "Square",
-    Dollar: "Dollar"
-};
-function isMathType(x) {
-    if (x === undefined)
-        return false;
-    else
-        switch (x) {
-            case "Parentheses":
-            case "Square":
-            case "Dollar":
-                return true;
-            default:
-                return false;
-        }
-}
-exports.isMathType = isMathType;
-function isNameHaving(x, name) {
-    return x !== undefined && (name === undefined
-        ? typeof x.name === "string"
-        : name === x.name);
-}
-exports.isNameHaving = isNameHaving;
-function isTextHaving(x) {
-    return x !== undefined && typeof x.text === "string";
-}
-exports.isTextHaving = isTextHaving;
-function isLaTeXHaving(x) {
-    return x !== undefined && Utils_1.isArray(x.latex);
-}
-exports.isLaTeXHaving = isLaTeXHaving;
-function isArgumentHaving(x) {
-    return x.arguments instanceof Array;
-}
-exports.isArgumentHaving = isArgumentHaving;
-exports.typeTeXSeq = "TeXSeq";
-exports.typeTeXEnv = "TeXEnv";
-exports.typeTeXBraces = "TeXBraces";
-exports.typeTeXComment = "TeXComment";
-exports.typeTeXRaw = "TeXRaw";
-exports.typeTeXComm = "TeXComm";
-exports.typeTeXCommS = "TeXCommS";
-var SubOrSuperSymbol;
-(function (SubOrSuperSymbol) {
-    SubOrSuperSymbol[SubOrSuperSymbol["SUP"] = 0] = "SUP";
-    SubOrSuperSymbol[SubOrSuperSymbol["SUB"] = 1] = "SUB";
-})(SubOrSuperSymbol = exports.SubOrSuperSymbol || (exports.SubOrSuperSymbol = {}));
-function isSubOrSuperSymbol(x) {
-    return x === SubOrSuperSymbol.SUP || x === SubOrSuperSymbol.SUB;
-}
-exports.isSubOrSuperSymbol = isSubOrSuperSymbol;
-exports.fromStringLaTeX = function (x) { return newTeXRaw(exports.protectString(x)); };
-exports.protectString = function (s) {
-    var newString = [];
-    for (var i = 0; i < s.length; i++)
-        newString.push(protectChar(s.charAt(i)));
-    return newString.join();
-};
-function protectChar(c) {
-    switch (c) {
-        case "#":
-            return "\\#";
-        case "$":
-            return "\\$";
-        case "%":
-            return "\\%";
-        case "^":
-            return "\\^{}";
-        case "&":
-            return "\\&";
-        case "{":
-            return "\\{";
-        case "}":
-            return "\\}";
-        case "~":
-            return "\\~{}";
-        case "\\":
-            return "\\textbackslash{}";
-        case "_":
-            return "\\_{}";
-        default:
-            return c;
-    }
-}
-exports.protectChar = protectChar;
-function isTypeHaving(x) {
-    var anyOfTypes = [];
-    for (var _i = 1; _i < arguments.length; _i++) {
-        anyOfTypes[_i - 1] = arguments[_i];
-    }
-    return anyOfTypes.length === 0 ? typeof x.type === "string" : anyOfTypes.some(function (type) { return x.type === type; });
-}
-exports.isTypeHaving = isTypeHaving;
-function isLaTeXBlock(x) {
-    return isLaTeXRaw(x) || isLaTeXNoRaw(x);
-}
-exports.isLaTeXBlock = isLaTeXBlock;
-function isLaTeXNoRaw(x) {
-    return isTeXEmpty(x)
-        || isTeXChar(x)
-        || isTeXComm(x)
-        || isTeXEnv(x)
-        || isTeXMath(x)
-        || isTeXLineBreak(x)
-        || isTeXBraces(x)
-        || isTeXComment(x);
-}
-exports.isLaTeXNoRaw = isLaTeXNoRaw;
-function isLaTeXRaw(x) {
-    return isTeXEmpty(x)
-        || isTeXRaw(x)
-        || isTeXComm(x)
-        || isTeXEnv(x)
-        || isTeXMath(x)
-        || isTeXLineBreak(x)
-        || isTeXBraces(x)
-        || isTeXComment(x);
-}
-exports.isLaTeXRaw = isLaTeXRaw;
-function isTeXRaw(x) {
-    return x !== undefined
-        && x.type !== undefined
-        && isTextHaving(x) && isTypeHaving(x, exports.typeTeXRaw);
-}
-exports.isTeXRaw = isTeXRaw;
-function isTeXChar(x) {
-    return x !== undefined
-        && typeof x.string === "string"
-        && typeof x.category === "number";
-}
-exports.isTeXChar = isTeXChar;
-function isTeXComm(x) {
-    return isNameHaving(x)
-        && isArgumentHaving(x)
-        && isTypeHaving(x, exports.typeTeXComm, exports.typeTeXCommS);
-}
-exports.isTeXComm = isTeXComm;
-function isTeXCommS(x) {
-    return isTeXComm(x) && x.arguments.length === 0;
-}
-exports.isTeXCommS = isTeXCommS;
-function isTeXEnv(x, name) {
-    return isTypeHaving(x, exports.typeTeXEnv);
-}
-exports.isTeXEnv = isTeXEnv;
-function isTeXMath(x) {
-    return isLaTeXHaving(x) && isTypeHaving(x) && isMathType(x.type);
-}
-exports.isTeXMath = isTeXMath;
-function isTeXLineBreak(x) {
-    return x !== undefined && typeof x.noNewPage === "boolean" && (x.measure === undefined || isMeasure(x.measure));
-}
-exports.isTeXLineBreak = isTeXLineBreak;
-function isSubOrSuperScript(x) {
-    return isSubOrSuperSymbol(x.type);
-}
-exports.isSubOrSuperScript = isSubOrSuperScript;
-function isTeXBraces(x) {
-    return isLaTeXHaving(x) && isTypeHaving(x, exports.typeTeXBraces);
-}
-exports.isTeXBraces = isTeXBraces;
-function isFixArg(x) {
-    return isTypeHaving(x, "FixArg");
-}
-exports.isFixArg = isFixArg;
-function isOptArg(x) {
-    return isTypeHaving(x, "OptArg");
-}
-exports.isOptArg = isOptArg;
-function isTeXComment(x) {
-    return isTextHaving(x) && isTypeHaving(x, exports.typeTeXComment);
-}
-exports.isTeXComment = isTeXComment;
-function isTeXEmpty(e) {
-    return e !== undefined && Object.keys(e).length === 0;
-}
-exports.isTeXEmpty = isTeXEmpty;
-function newFixArg(l) {
-    return { type: "FixArg", latex: l };
-}
-exports.newFixArg = newFixArg;
-function newOptArg(l) {
-    return l.length === 1 ? { type: "OptArg", latex: l } : { type: "MOptArg", latex: l };
-}
-exports.newOptArg = newOptArg;
-function newSymArg(l) {
-    return { type: "SymArg", latex: [l] };
-}
-exports.newSymArg = newSymArg;
-function newParArg(l) {
-    return { type: "ParArg", latex: [l] };
-}
-exports.newParArg = newParArg;
-function newMOptArg(l) {
-    return { type: "MOptArg", latex: l };
-}
-exports.newMOptArg = newMOptArg;
-function newMSymArg(l) {
-    return { type: "MSymArg", latex: l };
-}
-exports.newMSymArg = newMSymArg;
-function newMParArg(l) {
-    return { type: "MParArg", latex: l };
-}
-exports.newMParArg = newMParArg;
-function newCommandS(name) {
-    return {
-        name: name,
-        arguments: [],
-        type: exports.typeTeXCommS
-    };
-}
-exports.newCommandS = newCommandS;
-function newTeXRaw(text) {
-    return {
-        text: text,
-        type: exports.typeTeXRaw,
-        characterCategories: CategoryCode_1.convertToTeXCharsDefault(text)
-    };
-}
-exports.newTeXRaw = newTeXRaw;
-function newTeXMath(type, startSymbol, endSymbol, latex) {
-    return {
-        latex: latex,
-        type: type,
-        startSymbol: startSymbol,
-        endSymbol: endSymbol
-    };
-}
-exports.newTeXMath = newTeXMath;
-function newTeXBraces(latex) {
-    return {
-        latex: [latex],
-        type: exports.typeTeXBraces
-    };
-}
-exports.newTeXBraces = newTeXBraces;
-exports.newTeXMathDol = function (latex) {
-    return newTeXMath("Dollar", "$", "$", latex);
-};
-function newTeXComment(text) {
-    return {
-        text: text,
-        type: exports.typeTeXComment
-    };
-}
-exports.newTeXComment = newTeXComment;
-function newTeXComm(name) {
-    var args = [];
-    for (var _i = 1; _i < arguments.length; _i++) {
-        args[_i - 1] = arguments[_i];
-    }
-    return {
-        name: name,
-        arguments: args,
-        type: exports.typeTeXComm
-    };
-}
-exports.newTeXComm = newTeXComm;
-function newSubOrSuperScript(type, symbol, args) {
-    return {
-        type: type,
-        symbol: symbol,
-        arguments: args
-    };
-}
-exports.newSubOrSuperScript = newSubOrSuperScript;
-function newTeXEnv(name, latex) {
-    var args = [];
-    for (var _i = 2; _i < arguments.length; _i++) {
-        args[_i - 2] = arguments[_i];
-    }
-    return {
-        name: name,
-        latex: latex,
-        arguments: args,
-        type: exports.typeTeXEnv
-    };
-}
-exports.newTeXEnv = newTeXEnv;
-function stringifyLaTeX(tex) {
-    var arr = [];
-    (stringifyLaTeXInner(tex, arr));
-    return arr.join("");
-}
-exports.stringifyLaTeX = stringifyLaTeX;
-function stringifyLaTeXInner(tex, soFar) {
-    if (isTeXComm(tex)) {
-        soFar.push("\\", tex.name);
-        tex.arguments.forEach(function (l) { return stringifyLaTeXInner(l, soFar); });
-    }
-    else if (isTeXEnv(tex))
-        throw new Error("not supported yet");
-    else if (isTeXMath(tex)) {
-        soFar.push(tex.startSymbol);
-        tex.latex.forEach(function (t) { return stringifyLaTeXInner(t, soFar); });
-        soFar.push(tex.endSymbol);
-    }
-    else if (isTeXLineBreak(tex))
-        soFar.push("\n");
-    else if (isSubOrSuperScript(tex)) {
-        soFar.push(tex.symbol);
-        if (tex.arguments)
-            tex.arguments.forEach(function (arg) { return (stringifyLaTeXInner(arg, soFar)); });
-    }
-    else if (isTeXBraces(tex)) {
-        soFar.push("{");
-        tex.latex.forEach(function (t) { return stringifyLaTeXInner(t, soFar); });
-        soFar.push("}");
-    }
-    else if (isTeXComment(tex)) {
-        soFar.push("%" + tex.text + "\n");
-    }
-    else if (isTeXRaw(tex))
-        soFar.push(tex.text);
-    else if (isTeXChar(tex))
-        throw new Error("not supported yet");
-    else if (isFixArg(tex)) {
-        soFar.push("{");
-        tex.latex.forEach(function (t) { return stringifyLaTeXInner(t, soFar); });
-        soFar.push("}");
-    }
-    else if (isOptArg(tex)) {
-        soFar.push("[");
-        tex.latex.forEach(function (t) { return stringifyLaTeXInner(t, soFar); });
-        soFar.push("]");
-    }
-    else
-        throw new Error("Did not recognize " + JSON.stringify(tex));
-}
-//# sourceMappingURL=Syntax.js.map
+eval("\r\nObject.defineProperty(exports, \"__esModule\", { value: true });\r\nvar Utils_1 = __webpack_require__(/*! ../../../Utils */ \"./node_modules/latex-parser/ts-compiled/Utils.js\");\r\nvar CategoryCode_1 = __webpack_require__(/*! ../../TeX/CategoryCode */ \"./node_modules/latex-parser/ts-compiled/Text/TeX/CategoryCode.js\");\r\nfunction isMeasure(x) {\r\n    return isBuiltInMeasure(x) || isCustomMeasure(x);\r\n}\r\nexports.isMeasure = isMeasure;\r\nexports.measureTypes = {\r\n    \"pt\": true,\r\n    \"mm\": true,\r\n    \"cm\": true,\r\n    \"in\": true,\r\n    \"ex\": true,\r\n    \"em\": true,\r\n};\r\nfunction isMeasureType(x) {\r\n    return exports.measureTypes.hasOwnProperty(x);\r\n}\r\nexports.isMeasureType = isMeasureType;\r\nfunction isBuiltInMeasure(x) {\r\n    return isMeasureType(x.type) && Utils_1.isNumber(x.value);\r\n}\r\nexports.isBuiltInMeasure = isBuiltInMeasure;\r\nfunction isCustomMeasure(x) {\r\n    return isLaTeXBlock(x.expression);\r\n}\r\nexports.isCustomMeasure = isCustomMeasure;\r\nexports.mathTypes = {\r\n    Parentheses: \"Parentheses\",\r\n    Square: \"Square\",\r\n    Dollar: \"Dollar\"\r\n};\r\nfunction isMathType(x) {\r\n    if (x === undefined)\r\n        return false;\r\n    else\r\n        switch (x) {\r\n            case \"Parentheses\":\r\n            case \"Square\":\r\n            case \"Dollar\":\r\n                return true;\r\n            default:\r\n                return false;\r\n        }\r\n}\r\nexports.isMathType = isMathType;\r\nfunction isNameHaving(x, name) {\r\n    return x !== undefined && (name === undefined\r\n        ? typeof x.name === \"string\"\r\n        : name === x.name);\r\n}\r\nexports.isNameHaving = isNameHaving;\r\nfunction isTextHaving(x) {\r\n    return x !== undefined && typeof x.text === \"string\";\r\n}\r\nexports.isTextHaving = isTextHaving;\r\nfunction isLaTeXHaving(x) {\r\n    return x !== undefined && Utils_1.isArray(x.latex);\r\n}\r\nexports.isLaTeXHaving = isLaTeXHaving;\r\nfunction isArgumentHaving(x) {\r\n    return x.arguments instanceof Array;\r\n}\r\nexports.isArgumentHaving = isArgumentHaving;\r\nexports.typeTeXSeq = \"TeXSeq\";\r\nexports.typeTeXEnv = \"TeXEnv\";\r\nexports.typeTeXBraces = \"TeXBraces\";\r\nexports.typeTeXComment = \"TeXComment\";\r\nexports.typeTeXRaw = \"TeXRaw\";\r\nexports.typeTeXComm = \"TeXComm\";\r\nexports.typeTeXCommS = \"TeXCommS\";\r\nvar SubOrSuperSymbol;\r\n(function (SubOrSuperSymbol) {\r\n    SubOrSuperSymbol[SubOrSuperSymbol[\"SUP\"] = 0] = \"SUP\";\r\n    SubOrSuperSymbol[SubOrSuperSymbol[\"SUB\"] = 1] = \"SUB\";\r\n})(SubOrSuperSymbol = exports.SubOrSuperSymbol || (exports.SubOrSuperSymbol = {}));\r\nfunction isSubOrSuperSymbol(x) {\r\n    return x === SubOrSuperSymbol.SUP || x === SubOrSuperSymbol.SUB;\r\n}\r\nexports.isSubOrSuperSymbol = isSubOrSuperSymbol;\r\nexports.fromStringLaTeX = function (x) { return newTeXRaw(exports.protectString(x)); };\r\nexports.protectString = function (s) {\r\n    var newString = [];\r\n    for (var i = 0; i < s.length; i++)\r\n        newString.push(protectChar(s.charAt(i)));\r\n    return newString.join();\r\n};\r\nfunction protectChar(c) {\r\n    switch (c) {\r\n        case \"#\":\r\n            return \"\\\\#\";\r\n        case \"$\":\r\n            return \"\\\\$\";\r\n        case \"%\":\r\n            return \"\\\\%\";\r\n        case \"^\":\r\n            return \"\\\\^{}\";\r\n        case \"&\":\r\n            return \"\\\\&\";\r\n        case \"{\":\r\n            return \"\\\\{\";\r\n        case \"}\":\r\n            return \"\\\\}\";\r\n        case \"~\":\r\n            return \"\\\\~{}\";\r\n        case \"\\\\\":\r\n            return \"\\\\textbackslash{}\";\r\n        case \"_\":\r\n            return \"\\\\_{}\";\r\n        default:\r\n            return c;\r\n    }\r\n}\r\nexports.protectChar = protectChar;\r\nfunction isTypeHaving(x) {\r\n    var anyOfTypes = [];\r\n    for (var _i = 1; _i < arguments.length; _i++) {\r\n        anyOfTypes[_i - 1] = arguments[_i];\r\n    }\r\n    return anyOfTypes.length === 0 ? typeof x.type === \"string\" : anyOfTypes.some(function (type) { return x.type === type; });\r\n}\r\nexports.isTypeHaving = isTypeHaving;\r\nfunction isLaTeXBlock(x) {\r\n    return isLaTeXRaw(x) || isLaTeXNoRaw(x);\r\n}\r\nexports.isLaTeXBlock = isLaTeXBlock;\r\nfunction isLaTeXNoRaw(x) {\r\n    return isTeXEmpty(x)\r\n        || isTeXChar(x)\r\n        || isTeXComm(x)\r\n        || isTeXEnv(x)\r\n        || isTeXMath(x)\r\n        || isTeXLineBreak(x)\r\n        || isTeXBraces(x)\r\n        || isTeXComment(x);\r\n}\r\nexports.isLaTeXNoRaw = isLaTeXNoRaw;\r\nfunction isLaTeXRaw(x) {\r\n    return isTeXEmpty(x)\r\n        || isTeXRaw(x)\r\n        || isTeXComm(x)\r\n        || isTeXEnv(x)\r\n        || isTeXMath(x)\r\n        || isTeXLineBreak(x)\r\n        || isTeXBraces(x)\r\n        || isTeXComment(x);\r\n}\r\nexports.isLaTeXRaw = isLaTeXRaw;\r\nfunction isTeXRaw(x) {\r\n    return x !== undefined\r\n        && x.type !== undefined\r\n        && isTextHaving(x) && isTypeHaving(x, exports.typeTeXRaw);\r\n}\r\nexports.isTeXRaw = isTeXRaw;\r\nfunction isTeXChar(x) {\r\n    return x !== undefined\r\n        && typeof x.string === \"string\"\r\n        && typeof x.category === \"number\";\r\n}\r\nexports.isTeXChar = isTeXChar;\r\nfunction isTeXComm(x) {\r\n    return isNameHaving(x)\r\n        && isArgumentHaving(x)\r\n        && isTypeHaving(x, exports.typeTeXComm, exports.typeTeXCommS);\r\n}\r\nexports.isTeXComm = isTeXComm;\r\nfunction isTeXCommS(x) {\r\n    return isTeXComm(x) && x.arguments.length === 0;\r\n}\r\nexports.isTeXCommS = isTeXCommS;\r\nfunction isTeXEnv(x, name) {\r\n    return isTypeHaving(x, exports.typeTeXEnv);\r\n}\r\nexports.isTeXEnv = isTeXEnv;\r\nfunction isTeXMath(x) {\r\n    return isLaTeXHaving(x) && isTypeHaving(x) && isMathType(x.type);\r\n}\r\nexports.isTeXMath = isTeXMath;\r\nfunction isTeXLineBreak(x) {\r\n    return x !== undefined && typeof x.noNewPage === \"boolean\" && (x.measure === undefined || isMeasure(x.measure));\r\n}\r\nexports.isTeXLineBreak = isTeXLineBreak;\r\nfunction isSubOrSuperScript(x) {\r\n    return isSubOrSuperSymbol(x.type);\r\n}\r\nexports.isSubOrSuperScript = isSubOrSuperScript;\r\nfunction isTeXBraces(x) {\r\n    return isLaTeXHaving(x) && isTypeHaving(x, exports.typeTeXBraces);\r\n}\r\nexports.isTeXBraces = isTeXBraces;\r\nfunction isFixArg(x) {\r\n    return isTypeHaving(x, \"FixArg\");\r\n}\r\nexports.isFixArg = isFixArg;\r\nfunction isOptArg(x) {\r\n    return isTypeHaving(x, \"OptArg\");\r\n}\r\nexports.isOptArg = isOptArg;\r\nfunction isTeXComment(x) {\r\n    return isTextHaving(x) && isTypeHaving(x, exports.typeTeXComment);\r\n}\r\nexports.isTeXComment = isTeXComment;\r\nfunction isTeXEmpty(e) {\r\n    return e !== undefined && Object.keys(e).length === 0;\r\n}\r\nexports.isTeXEmpty = isTeXEmpty;\r\nfunction newFixArg(l) {\r\n    return { type: \"FixArg\", latex: l };\r\n}\r\nexports.newFixArg = newFixArg;\r\nfunction newOptArg(l) {\r\n    return l.length === 1 ? { type: \"OptArg\", latex: l } : { type: \"MOptArg\", latex: l };\r\n}\r\nexports.newOptArg = newOptArg;\r\nfunction newSymArg(l) {\r\n    return { type: \"SymArg\", latex: [l] };\r\n}\r\nexports.newSymArg = newSymArg;\r\nfunction newParArg(l) {\r\n    return { type: \"ParArg\", latex: [l] };\r\n}\r\nexports.newParArg = newParArg;\r\nfunction newMOptArg(l) {\r\n    return { type: \"MOptArg\", latex: l };\r\n}\r\nexports.newMOptArg = newMOptArg;\r\nfunction newMSymArg(l) {\r\n    return { type: \"MSymArg\", latex: l };\r\n}\r\nexports.newMSymArg = newMSymArg;\r\nfunction newMParArg(l) {\r\n    return { type: \"MParArg\", latex: l };\r\n}\r\nexports.newMParArg = newMParArg;\r\nfunction newCommandS(name) {\r\n    return {\r\n        name: name,\r\n        arguments: [],\r\n        type: exports.typeTeXCommS\r\n    };\r\n}\r\nexports.newCommandS = newCommandS;\r\nfunction newTeXRaw(text) {\r\n    return {\r\n        text: text,\r\n        type: exports.typeTeXRaw,\r\n        characterCategories: CategoryCode_1.convertToTeXCharsDefault(text)\r\n    };\r\n}\r\nexports.newTeXRaw = newTeXRaw;\r\nfunction newTeXMath(type, startSymbol, endSymbol, latex) {\r\n    return {\r\n        latex: latex,\r\n        type: type,\r\n        startSymbol: startSymbol,\r\n        endSymbol: endSymbol\r\n    };\r\n}\r\nexports.newTeXMath = newTeXMath;\r\nfunction newTeXBraces(latex) {\r\n    return {\r\n        latex: [latex],\r\n        type: exports.typeTeXBraces\r\n    };\r\n}\r\nexports.newTeXBraces = newTeXBraces;\r\nexports.newTeXMathDol = function (latex) {\r\n    return newTeXMath(\"Dollar\", \"$\", \"$\", latex);\r\n};\r\nfunction newTeXComment(text) {\r\n    return {\r\n        text: text,\r\n        type: exports.typeTeXComment\r\n    };\r\n}\r\nexports.newTeXComment = newTeXComment;\r\nfunction newTeXComm(name) {\r\n    var args = [];\r\n    for (var _i = 1; _i < arguments.length; _i++) {\r\n        args[_i - 1] = arguments[_i];\r\n    }\r\n    return {\r\n        name: name,\r\n        arguments: args,\r\n        type: exports.typeTeXComm\r\n    };\r\n}\r\nexports.newTeXComm = newTeXComm;\r\nfunction newSubOrSuperScript(type, symbol, args) {\r\n    return {\r\n        type: type,\r\n        symbol: symbol,\r\n        arguments: args\r\n    };\r\n}\r\nexports.newSubOrSuperScript = newSubOrSuperScript;\r\nfunction newTeXEnv(name, latex) {\r\n    var args = [];\r\n    for (var _i = 2; _i < arguments.length; _i++) {\r\n        args[_i - 2] = arguments[_i];\r\n    }\r\n    return {\r\n        name: name,\r\n        latex: latex,\r\n        arguments: args,\r\n        type: exports.typeTeXEnv\r\n    };\r\n}\r\nexports.newTeXEnv = newTeXEnv;\r\nfunction stringifyLaTeX(tex) {\r\n    var arr = [];\r\n    (stringifyLaTeXInner(tex, arr));\r\n    return arr.join(\"\");\r\n}\r\nexports.stringifyLaTeX = stringifyLaTeX;\r\nfunction stringifyLaTeXInner(tex, soFar) {\r\n    if (isTeXComm(tex)) {\r\n        soFar.push(\"\\\\\", tex.name);\r\n        tex.arguments.forEach(function (l) { return stringifyLaTeXInner(l, soFar); });\r\n    }\r\n    else if (isTeXEnv(tex))\r\n        throw new Error(\"not supported yet\");\r\n    else if (isTeXMath(tex)) {\r\n        soFar.push(tex.startSymbol);\r\n        tex.latex.forEach(function (t) { return stringifyLaTeXInner(t, soFar); });\r\n        soFar.push(tex.endSymbol);\r\n    }\r\n    else if (isTeXLineBreak(tex))\r\n        soFar.push(\"\\n\");\r\n    else if (isSubOrSuperScript(tex)) {\r\n        soFar.push(tex.symbol);\r\n        if (tex.arguments)\r\n            tex.arguments.forEach(function (arg) { return (stringifyLaTeXInner(arg, soFar)); });\r\n    }\r\n    else if (isTeXBraces(tex)) {\r\n        soFar.push(\"{\");\r\n        tex.latex.forEach(function (t) { return stringifyLaTeXInner(t, soFar); });\r\n        soFar.push(\"}\");\r\n    }\r\n    else if (isTeXComment(tex)) {\r\n        soFar.push(\"%\" + tex.text + \"\\n\");\r\n    }\r\n    else if (isTeXRaw(tex))\r\n        soFar.push(tex.text);\r\n    else if (isTeXChar(tex))\r\n        throw new Error(\"not supported yet\");\r\n    else if (isFixArg(tex)) {\r\n        soFar.push(\"{\");\r\n        tex.latex.forEach(function (t) { return stringifyLaTeXInner(t, soFar); });\r\n        soFar.push(\"}\");\r\n    }\r\n    else if (isOptArg(tex)) {\r\n        soFar.push(\"[\");\r\n        tex.latex.forEach(function (t) { return stringifyLaTeXInner(t, soFar); });\r\n        soFar.push(\"]\");\r\n    }\r\n    else\r\n        throw new Error(\"Did not recognize \" + JSON.stringify(tex));\r\n}\r\n//# sourceMappingURL=Syntax.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-parser/ts-compiled/Text/LaTeX/Base/Syntax.js?");
 
 /***/ }),
-/* 4 */
+
+/***/ "./node_modules/latex-parser/ts-compiled/Text/TeX/CategoryCode.js":
+/*!************************************************************************!*\
+  !*** ./node_modules/latex-parser/ts-compiled/Text/TeX/CategoryCode.js ***!
+  \************************************************************************/
+/*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.supportedMarkups = {
-    "ascii": true,
-    "unicode": true,
-    "html": true
-};
-//# sourceMappingURL=options.js.map
+eval("\r\nObject.defineProperty(exports, \"__esModule\", { value: true });\r\nexports.defaultCategories = function (char) {\r\n    switch (char) {\r\n        case \"\\\\\":\r\n            return 0;\r\n        case \"{\":\r\n            return 1;\r\n        case \"}\":\r\n            return 2;\r\n        case \"$\":\r\n            return 3;\r\n        case \"&\":\r\n            return 4;\r\n        case \"\\r\":\r\n            return 5;\r\n        case \"#\":\r\n            return 6;\r\n        case \"^\":\r\n            return 7;\r\n        case \"_\":\r\n            return 8;\r\n        case \"\\0\":\r\n            return 9;\r\n        case \" \":\r\n            return 10;\r\n        case \"~\":\r\n            return 13;\r\n        case \"%\":\r\n            return 14;\r\n        case \"\\d\":\r\n            return 15;\r\n        default:\r\n            return 11;\r\n    }\r\n};\r\nfunction convertToTeXCharsDefault(str) {\r\n    return convertToTeXChars(exports.defaultCategories, str);\r\n}\r\nexports.convertToTeXCharsDefault = convertToTeXCharsDefault;\r\nfunction convertToTeXChars(categoryMap, str) {\r\n    var chars = [];\r\n    for (var i = 0; i < str.length; i++) {\r\n        var charAt = str.charAt(i);\r\n        chars.push({\r\n            string: charAt,\r\n            category: categoryMap(charAt)\r\n        });\r\n    }\r\n    return chars;\r\n}\r\nexports.convertToTeXChars = convertToTeXChars;\r\n//# sourceMappingURL=CategoryCode.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-parser/ts-compiled/Text/TeX/CategoryCode.js?");
 
 /***/ }),
-/* 5 */
+
+/***/ "./node_modules/latex-parser/ts-compiled/Utils.js":
+/*!********************************************************!*\
+  !*** ./node_modules/latex-parser/ts-compiled/Utils.js ***!
+  \********************************************************/
+/*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", { value: true });
-__export(__webpack_require__(2));
-__export(__webpack_require__(3));
-__export(__webpack_require__(21));
-//# sourceMappingURL=main.js.map
+eval("\r\nObject.defineProperty(exports, \"__esModule\", { value: true });\r\nfunction updateProperties(target, values, opt_keys, opt_attributes) {\r\n    if (opt_attributes === void 0) { opt_attributes = {\r\n        writable: true,\r\n        enumerable: true,\r\n        configurable: true\r\n    }; }\r\n    if (!(target instanceof Object))\r\n        throw new TypeError('\"target\" isn\\'t an Object instance');\r\n    if (values === undefined)\r\n        return;\r\n    if (!(values instanceof Object))\r\n        throw new TypeError('\"properties\" isn\\'t an Object instance');\r\n    if (opt_attributes === undefined) {\r\n        opt_attributes = { writable: true, enumerable: true, configurable: true };\r\n    }\r\n    else if (!(opt_attributes instanceof Object)) {\r\n        throw new TypeError('\"attributes\" isn\\'t an Object instance');\r\n    }\r\n    if (opt_keys === undefined) {\r\n        for (var key in values) {\r\n            if (values[key] !== undefined) {\r\n                Object.defineProperty(target, key, Object.create(opt_attributes, { value: { value: values[key] } }));\r\n            }\r\n        }\r\n    }\r\n    else if (opt_keys instanceof Array) {\r\n        opt_keys.forEach(function (key) {\r\n            if (values[key] !== undefined) {\r\n                Object.defineProperty(target, key, Object.create(opt_attributes, { value: { value: values[key] } }));\r\n            }\r\n        });\r\n    }\r\n    else if (opt_keys instanceof Object) {\r\n        for (var targetKey in opt_keys) {\r\n            var key = opt_keys[targetKey];\r\n            if (values[key] !== undefined)\r\n                Object.defineProperty(target, targetKey, Object.create(opt_attributes, { value: { value: values[key] } }));\r\n        }\r\n    }\r\n    else {\r\n        throw new TypeError('\"keys\" isn\\'t an Object instance');\r\n    }\r\n}\r\nexports.updateProperties = updateProperties;\r\nfunction testProperties(target, values, opt_keys, opt_skipUndefined) {\r\n    if (opt_skipUndefined === void 0) { opt_skipUndefined = true; }\r\n    if (!(target instanceof Object))\r\n        throw new TypeError('\"target\" isn\\'t an Object instance');\r\n    if (values === undefined)\r\n        return true;\r\n    if (!(values instanceof Object))\r\n        throw new TypeError('\"properties\" isn\\'t an Object instance');\r\n    if (opt_skipUndefined === undefined)\r\n        opt_skipUndefined = true;\r\n    if (opt_keys === undefined) {\r\n        for (var key in values) {\r\n            if (target[key] !== values[key]\r\n                && !(values[key] === undefined && opt_skipUndefined))\r\n                return false;\r\n        }\r\n    }\r\n    else if (opt_keys instanceof Array) {\r\n        return opt_keys.every(function (key) {\r\n            return target[key] === values[key] || (values[key] === undefined && opt_skipUndefined);\r\n        });\r\n    }\r\n    else if (opt_keys instanceof Object) {\r\n        for (var targetKey in opt_keys) {\r\n            var key = opt_keys[targetKey];\r\n            if (target[targetKey] !== values[key] && !(values[key] === undefined && opt_skipUndefined))\r\n                return false;\r\n        }\r\n    }\r\n    else {\r\n        throw new TypeError('\"keys\" isn\\'t an Object instance');\r\n    }\r\n    return true;\r\n}\r\nexports.testProperties = testProperties;\r\nexports.mustBeNumber = function (a, msg) {\r\n    if (!(isNumber(a)))\r\n        throw new TypeError(msg ? msg : \"Expected number\");\r\n    return a;\r\n};\r\nfunction isNumber(x) {\r\n    return typeof x === \"number\";\r\n}\r\nexports.isNumber = isNumber;\r\nfunction isString(x) {\r\n    return typeof x === \"string\";\r\n}\r\nexports.isString = isString;\r\nfunction mustNotBeUndefined(x, msg) {\r\n    if (!x)\r\n        throw new Error(msg);\r\n    return x;\r\n}\r\nexports.mustNotBeUndefined = mustNotBeUndefined;\r\nfunction mustBeObject(o, msg) {\r\n    if (!(o instanceof Object))\r\n        throw new TypeError(msg ? msg : \"Expected Object\");\r\n    return o;\r\n}\r\nexports.mustBeObject = mustBeObject;\r\nfunction mustBeString(o, msg) {\r\n    if (typeof o !== \"string\")\r\n        throw new TypeError(msg ? msg : \"Expected string\");\r\n    return o;\r\n}\r\nexports.mustBeString = mustBeString;\r\nfunction mustBeArray(a, msg) {\r\n    if (!(isArray(a)))\r\n        throw new TypeError(msg ? msg : \"Expected Array\");\r\n    return a;\r\n}\r\nexports.mustBeArray = mustBeArray;\r\nfunction isArray(x) {\r\n    return !!x && x.constructor === Array;\r\n}\r\nexports.isArray = isArray;\r\nexports.mconcat = function (mappend) {\r\n    var args = [];\r\n    for (var _i = 1; _i < arguments.length; _i++) {\r\n        args[_i - 1] = arguments[_i];\r\n    }\r\n    return args.reduceRight(mappend);\r\n};\r\nexports.snd = function (pair) { return pair[1]; };\r\nfunction concatMap(arr, f) {\r\n    return [].concat.apply([], arr.map(f));\r\n}\r\nexports.concatMap = concatMap;\r\n//# sourceMappingURL=Utils.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-parser/ts-compiled/Utils.js?");
 
 /***/ }),
-/* 6 */
+
+/***/ "./node_modules/latex-to-unicode-converter/index.js":
+/*!**********************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/index.js ***!
+  \**********************************************************/
+/*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.defaultCategories = function (char) {
-    switch (char) {
-        case "\\":
-            return 0;
-        case "{":
-            return 1;
-        case "}":
-            return 2;
-        case "$":
-            return 3;
-        case "&":
-            return 4;
-        case "\r":
-            return 5;
-        case "#":
-            return 6;
-        case "^":
-            return 7;
-        case "_":
-            return 8;
-        case "\0":
-            return 9;
-        case " ":
-            return 10;
-        case "~":
-            return 13;
-        case "%":
-            return 14;
-        case "\d":
-            return 15;
-        default:
-            return 11;
-    }
-};
-function convertToTeXCharsDefault(str) {
-    return convertToTeXChars(exports.defaultCategories, str);
-}
-exports.convertToTeXCharsDefault = convertToTeXCharsDefault;
-function convertToTeXChars(categoryMap, str) {
-    var chars = [];
-    for (var i = 0; i < str.length; i++) {
-        var charAt = str.charAt(i);
-        chars.push({
-            string: charAt,
-            category: categoryMap(charAt)
-        });
-    }
-    return chars;
-}
-exports.convertToTeXChars = convertToTeXChars;
-//# sourceMappingURL=CategoryCode.js.map
+eval("\nfunction __export(m) {\n    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];\n}\nObject.defineProperty(exports, \"__esModule\", { value: true });\n__export(__webpack_require__(/*! ./ts-compiled/command-aliases */ \"./node_modules/latex-to-unicode-converter/ts-compiled/command-aliases.js\"));\n__export(__webpack_require__(/*! ./ts-compiled/convert */ \"./node_modules/latex-to-unicode-converter/ts-compiled/convert.js\"));\n__export(__webpack_require__(/*! ./ts-compiled/options */ \"./node_modules/latex-to-unicode-converter/ts-compiled/options.js\"));\n__export(__webpack_require__(/*! ./ts-compiled/unknown-command */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unknown-command.js\"));\n__export(__webpack_require__(/*! ./ts-compiled/util */ \"./node_modules/latex-to-unicode-converter/ts-compiled/util.js\"));\n__export(__webpack_require__(/*! ./ts-compiled/tex/KnownCommand */ \"./node_modules/latex-to-unicode-converter/ts-compiled/tex/KnownCommand.js\"));\n__export(__webpack_require__(/*! ./ts-compiled/tex/KnownCommand0Args */ \"./node_modules/latex-to-unicode-converter/ts-compiled/tex/KnownCommand0Args.js\"));\n__export(__webpack_require__(/*! ./ts-compiled/tex/KnownCommand1Args */ \"./node_modules/latex-to-unicode-converter/ts-compiled/tex/KnownCommand1Args.js\"));\n__export(__webpack_require__(/*! ./ts-compiled/latex/commands/1args/index */ \"./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/index.js\"));\n//# sourceMappingURL=index.js.map\n\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/index.js?");
 
 /***/ }),
-/* 7 */
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/command-aliases.js":
+/*!********************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/command-aliases.js ***!
+  \********************************************************************************/
+/*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-
-
-function Parsimmon(action) {
-  if (!(this instanceof Parsimmon)) {
-    return new Parsimmon(action);
-  }
-  this._ = action;
-}
-
-var _ = Parsimmon.prototype;
-
-// -*- Helpers -*-
-
-function isParser(obj) {
-  return obj instanceof Parsimmon;
-}
-
-function isArray(x) {
-  return {}.toString.call(x) === '[object Array]';
-}
-
-function makeSuccess(index, value) {
-  return {
-    status: true,
-    index: index,
-    value: value,
-    furthest: -1,
-    expected: []
-  };
-}
-
-function makeFailure(index, expected) {
-  return {
-    status: false,
-    index: -1,
-    value: null,
-    furthest: index,
-    expected: [expected]
-  };
-}
-
-function mergeReplies(result, last) {
-  if (!last) {
-    return result;
-  }
-  if (result.furthest > last.furthest) {
-    return result;
-  }
-  var expected = (result.furthest === last.furthest)
-    ? unsafeUnion(result.expected, last.expected)
-    : last.expected;
-  return {
-    status: result.status,
-    index: result.index,
-    value: result.value,
-    furthest: last.furthest,
-    expected: expected
-  };
-}
-
-function makeLineColumnIndex(input, i) {
-  var lines = input.slice(0, i).split('\n');
-  // Note that unlike the character offset, the line and column offsets are
-  // 1-based.
-  var lineWeAreUpTo = lines.length;
-  var columnWeAreUpTo = lines[lines.length - 1].length + 1;
-  return {
-    offset: i,
-    line: lineWeAreUpTo,
-    column: columnWeAreUpTo
-  };
-}
-
-// Returns the sorted set union of two arrays of strings. Note that if both
-// arrays are empty, it simply returns the first array, and if exactly one
-// array is empty, it returns the other one unsorted. This is safe because
-// expectation arrays always start as [] or [x], so as long as we merge with
-// this function, we know they stay in sorted order.
-function unsafeUnion(xs, ys) {
-  // Exit early if either array is empty (common case)
-  var xn = xs.length;
-  var yn = ys.length;
-  if (xn === 0) {
-    return ys;
-  } else if (yn === 0) {
-    return xs;
-  }
-  // Two non-empty arrays: do the full algorithm
-  var obj = {};
-  for (var i = 0; i < xn; i++) {
-    obj[xs[i]] = true;
-  }
-  for (var j = 0; j < yn; j++) {
-    obj[ys[j]] = true;
-  }
-  var keys = [];
-  for (var k in obj) {
-    if (obj.hasOwnProperty(k)) {
-      keys.push(k);
-    }
-  }
-  keys.sort();
-  return keys;
-}
-
-function assertParser(p) {
-  if (!isParser(p)) {
-    throw new Error('not a parser: ' + p);
-  }
-}
-
-// TODO[ES5]: Switch to Array.isArray eventually.
-function assertArray(x) {
-  if (!isArray(x)) {
-    throw new Error('not an array: ' + x);
-  }
-}
-
-function assertNumber(x) {
-  if (typeof x !== 'number') {
-    throw new Error('not a number: ' + x);
-  }
-}
-
-function assertRegexp(x) {
-  if (!(x instanceof RegExp)) {
-    throw new Error('not a regexp: '+x);
-  }
-  var f = flags(x);
-  for (var i = 0; i < f.length; i++) {
-    var c = f.charAt(i);
-    // Only allow regexp flags [imu] for now, since [g] and [y] specifically
-    // mess up Parsimmon. If more non-stateful regexp flags are added in the
-    // future, this will need to be revisited.
-    if (c !== 'i' && c !== 'm' && c !== 'u') {
-      throw new Error('unsupported regexp flag "' + c + '": ' + x);
-    }
-  }
-}
-
-function assertFunction(x) {
-  if (typeof x !== 'function') {
-    throw new Error('not a function: ' + x);
-  }
-}
-
-function assertString(x) {
-  if (typeof x !== 'string') {
-    throw new Error('not a string: ' + x);
-  }
-}
-
-function formatExpected(expected) {
-  if (expected.length === 1) {
-    return expected[0];
-  }
-  return 'one of ' + expected.join(', ');
-}
-
-function formatGot(input, error) {
-  var index = error.index;
-  var i = index.offset;
-  if (i === input.length) {
-    return ', got the end of the input';
-  }
-  var prefix = (i > 0 ? '\'...' : '\'');
-  var suffix = (input.length - i > 12 ? '...\'' : '\'');
-  return ' at line ' + index.line + ' column ' + index.column
-    +  ', got ' + prefix + input.slice(i, i + 12) + suffix;
-}
-
-function formatError(input, error) {
-  return 'expected ' +
-    formatExpected(error.expected) +
-    formatGot(input, error);
-}
-
-function flags(re) {
-  var s = '' + re;
-  return s.slice(s.lastIndexOf('/') + 1);
-}
-
-function anchoredRegexp(re) {
-  return RegExp('^(?:' + re.source + ')', flags(re));
-}
-
-// -*- Combinators -*-
-
-function seq() {
-  var parsers = [].slice.call(arguments);
-  var numParsers = parsers.length;
-  for (var j = 0; j < numParsers; j += 1) {
-    assertParser(parsers[j]);
-  }
-  return Parsimmon(function(input, i) {
-    var result;
-    var accum = new Array(numParsers);
-    for (var j = 0; j < numParsers; j += 1) {
-      result = mergeReplies(parsers[j]._(input, i), result);
-      if (!result.status) {
-        return result;
-      }
-      accum[j] = result.value;
-      i = result.index;
-    }
-    return mergeReplies(makeSuccess(i, accum), result);
-  });
-}
-
-function seqObj() {
-  var seenKeys = {};
-  var totalKeys = 0;
-  var parsers = [].slice.call(arguments);
-  var numParsers = parsers.length;
-  for (var j = 0; j < numParsers; j += 1) {
-    var p = parsers[j];
-    if (isParser(p)) {
-      continue;
-    }
-    if (isArray(p)) {
-      var isWellFormed =
-        p.length === 2 &&
-        typeof p[0] === 'string' &&
-        isParser(p[1]);
-      if (isWellFormed) {
-        var key = p[0];
-        if (seenKeys[key]) {
-          throw new Error('seqObj: duplicate key ' + key);
-        }
-        seenKeys[key] = true;
-        totalKeys++;
-        continue;
-      }
-    }
-    throw new Error(
-      'seqObj arguments must be parsers or ' +
-      '[string, parser] array pairs.'
-    );
-  }
-  if (totalKeys === 0) {
-    throw new Error('seqObj expects at least one named parser, found zero');
-  }
-  return Parsimmon(function(input, i) {
-    var result;
-    var accum = {};
-    for (var j = 0; j < numParsers; j += 1) {
-      var name;
-      var parser;
-      if (isArray(parsers[j])) {
-        name = parsers[j][0];
-        parser = parsers[j][1];
-      } else {
-        name = null;
-        parser = parsers[j];
-      }
-      result = mergeReplies(parser._(input, i), result);
-      if (!result.status) {
-        return result;
-      }
-      if (name) {
-        accum[name] = result.value;
-      }
-      i = result.index;
-    }
-    return mergeReplies(makeSuccess(i, accum), result);
-  });
-}
-
-function seqMap() {
-  var args = [].slice.call(arguments);
-  if (args.length === 0) {
-    throw new Error('seqMap needs at least one argument');
-  }
-  var mapper = args.pop();
-  assertFunction(mapper);
-  return seq.apply(null, args).map(function(results) {
-    return mapper.apply(null, results);
-  });
-}
-
-// TODO[ES5]: Revisit this with Object.keys and .bind.
-function createLanguage(parsers) {
-  var language = {};
-  for (var key in parsers) {
-    if ({}.hasOwnProperty.call(parsers, key)) {
-      (function(key) {
-        var func = function() {
-          return parsers[key](language);
-        };
-        language[key] = lazy(func);
-      }(key));
-    }
-  }
-  return language;
-}
-
-function alt() {
-  var parsers = [].slice.call(arguments);
-  var numParsers = parsers.length;
-  if (numParsers === 0) {
-    return fail('zero alternates');
-  }
-  for (var j = 0; j < numParsers; j += 1) {
-    assertParser(parsers[j]);
-  }
-  return Parsimmon(function(input, i) {
-    var result;
-    for (var j = 0; j < parsers.length; j += 1) {
-      result = mergeReplies(parsers[j]._(input, i), result);
-      if (result.status) {
-        return result;
-      }
-    }
-    return result;
-  });
-}
-
-function sepBy(parser, separator) {
-  // Argument asserted by sepBy1
-  return sepBy1(parser, separator).or(succeed([]));
-}
-
-function sepBy1(parser, separator) {
-  assertParser(parser);
-  assertParser(separator);
-  var pairs = separator.then(parser).many();
-  return parser.chain(function(r) {
-    return pairs.map(function(rs) {
-      return [r].concat(rs);
-    });
-  });
-}
-
-// -*- Core Parsing Methods -*-
-
-_.parse = function(input) {
-  if (typeof input !== 'string') {
-    throw new Error('.parse must be called with a string as its argument');
-  }
-  var result = this.skip(eof)._(input, 0);
-  if (result.status) {
-    return {
-      status: true,
-      value: result.value
-    };
-  }
-  return {
-    status: false,
-    index: makeLineColumnIndex(input, result.furthest),
-    expected: result.expected
-  };
-};
-
-// -*- Other Methods -*-
-
-_.tryParse = function(str) {
-  var result = this.parse(str);
-  if (result.status) {
-    return result.value;
-  } else {
-    var msg = formatError(str, result);
-    var err = new Error(msg);
-    err.type = 'ParsimmonError';
-    err.result = result;
-    throw err;
-  }
-};
-
-_.or = function(alternative) {
-  return alt(this, alternative);
-};
-
-_.trim = function(parser) {
-  return this.wrap(parser, parser);
-};
-
-_.wrap = function(leftParser, rightParser) {
-  return seqMap(
-    leftParser,
-    this,
-    rightParser,
-    function(left, middle) {
-      return middle;
-    }
-  );
-};
-
-_.thru = function(wrapper) {
-  return wrapper(this);
-};
-
-_.then = function(next) {
-  assertParser(next);
-  return seq(this, next).map(function(results) { return results[1]; });
-};
-
-_.many = function() {
-  var self = this;
-
-  return Parsimmon(function(input, i) {
-    var accum = [];
-    var result = undefined;
-
-    for (;;) {
-      result = mergeReplies(self._(input, i), result);
-      if (result.status) {
-        i = result.index;
-        accum.push(result.value);
-      } else {
-        return mergeReplies(makeSuccess(i, accum), result);
-      }
-    }
-  });
-};
-
-_.tie = function() {
-  return this.map(function(args) {
-    assertArray(args);
-    var s = '';
-    for (var i = 0; i < args.length; i++) {
-      assertString(args[i]);
-      s += args[i];
-    }
-    return s;
-  });
-};
-
-_.times = function(min, max) {
-  var self = this;
-  if (arguments.length < 2) {
-    max = min;
-  }
-  assertNumber(min);
-  assertNumber(max);
-  return Parsimmon(function(input, i) {
-    var accum = [];
-    var result = undefined;
-    var prevResult = undefined;
-    for (var times = 0; times < min; times += 1) {
-      result = self._(input, i);
-      prevResult = mergeReplies(result, prevResult);
-      if (result.status) {
-        i = result.index;
-        accum.push(result.value);
-      } else {
-        return prevResult;
-      }
-    }
-    for (; times < max; times += 1) {
-      result = self._(input, i);
-      prevResult = mergeReplies(result, prevResult);
-      if (result.status) {
-        i = result.index;
-        accum.push(result.value);
-      } else {
-        break;
-      }
-    }
-    return mergeReplies(makeSuccess(i, accum), prevResult);
-  });
-};
-
-_.result = function(res) {
-  return this.map(function() {
-    return res;
-  });
-};
-
-_.atMost = function(n) {
-  return this.times(0, n);
-};
-
-_.atLeast = function(n) {
-  return seqMap(this.times(n), this.many(), function(init, rest) {
-    return init.concat(rest);
-  });
-};
-
-_.map = function(fn) {
-  assertFunction(fn);
-  var self = this;
-  return Parsimmon(function(input, i) {
-    var result = self._(input, i);
-    if (!result.status) {
-      return result;
-    }
-    return mergeReplies(makeSuccess(result.index, fn(result.value)), result);
-  });
-};
-
-_.skip = function(next) {
-  return seq(this, next).map(function(results) { return results[0]; });
-};
-
-_.mark = function() {
-  return seqMap(index, this, index, function(start, value, end) {
-    return {
-      start: start,
-      value: value,
-      end: end
-    };
-  });
-};
-
-_.node = function(name) {
-  return seqMap(index, this, index, function(start, value, end) {
-    return {
-      name: name,
-      value: value,
-      start: start,
-      end: end
-    };
-  });
-};
-
-_.sepBy = function(separator) {
-  return sepBy(this, separator);
-};
-
-_.sepBy1 = function(separator) {
-  return sepBy1(this, separator);
-};
-
-_.lookahead = function(x) {
-  return this.skip(lookahead(x));
-};
-
-_.notFollowedBy = function(x) {
-  return this.skip(notFollowedBy(x));
-};
-
-_.desc = function(expected) {
-  var self = this;
-  return Parsimmon(function(input, i) {
-    var reply = self._(input, i);
-    if (!reply.status) {
-      reply.expected = [expected];
-    }
-    return reply;
-  });
-};
-
-_.fallback = function(result) {
-  return this.or(succeed(result));
-};
-
-_.ap = function(other) {
-  return seqMap(other, this, function(f, x) {
-    return f(x);
-  });
-};
-
-_.chain = function(f) {
-  var self = this;
-  return Parsimmon(function(input, i) {
-    var result = self._(input, i);
-    if (!result.status) {
-      return result;
-    }
-    var nextParser = f(result.value);
-    return mergeReplies(nextParser._(input, result.index), result);
-  });
-};
-
-// -*- Constructors -*-
-
-function string(str) {
-  assertString(str);
-  var expected = '\'' + str + '\'';
-  return Parsimmon(function(input, i) {
-    var j = i + str.length;
-    var head = input.slice(i, j);
-    if (head === str) {
-      return makeSuccess(j, head);
-    } else {
-      return makeFailure(i, expected);
-    }
-  });
-}
-
-function regexp(re, group) {
-  assertRegexp(re);
-  if (arguments.length >= 2) {
-    assertNumber(group);
-  } else {
-    group = 0;
-  }
-  var anchored = anchoredRegexp(re);
-  var expected = '' + re;
-  return Parsimmon(function(input, i) {
-    var match = anchored.exec(input.slice(i));
-    if (match) {
-      if (0 <= group && group <= match.length) {
-        var fullMatch = match[0];
-        var groupMatch = match[group];
-        return makeSuccess(i + fullMatch.length, groupMatch);
-      }
-      var message =
-        'valid match group (0 to ' + match.length + ') in ' + expected;
-      return makeFailure(i, message);
-    }
-    return makeFailure(i, expected);
-  });
-}
-
-function succeed(value) {
-  return Parsimmon(function(input, i) {
-    return makeSuccess(i, value);
-  });
-}
-
-function fail(expected) {
-  return Parsimmon(function(input, i) {
-    return makeFailure(i, expected);
-  });
-}
-
-function lookahead(x) {
-  if (isParser(x)) {
-    return Parsimmon(function(input, i) {
-      var result = x._(input, i);
-      result.index = i;
-      result.value = '';
-      return result;
-    });
-  } else if (typeof x === 'string') {
-    return lookahead(string(x));
-  } else if (x instanceof RegExp) {
-    return lookahead(regexp(x));
-  }
-  throw new Error('not a string, regexp, or parser: ' + x);
-}
-
-function notFollowedBy(parser) {
-  assertParser(parser);
-  return Parsimmon(function(input, i) {
-    var result = parser._(input, i);
-    var text = input.slice(i, result.index);
-    return result.status
-      ? makeFailure(i, 'not "' + text + '"')
-      : makeSuccess(i, null);
-  });
-}
-
-function test(predicate) {
-  assertFunction(predicate);
-  return Parsimmon(function(input, i) {
-    var char = input.charAt(i);
-    if (i < input.length && predicate(char)) {
-      return makeSuccess(i + 1, char);
-    } else {
-      return makeFailure(i, 'a character matching ' + predicate);
-    }
-  });
-}
-
-function oneOf(str) {
-  return test(function(ch) {
-    return str.indexOf(ch) >= 0;
-  });
-}
-
-function noneOf(str) {
-  return test(function(ch) {
-    return str.indexOf(ch) < 0;
-  });
-}
-
-function custom(parsingFunction) {
-  return Parsimmon(parsingFunction(makeSuccess, makeFailure));
-}
-
-// TODO[ES5]: Improve error message using JSON.stringify eventually.
-function range(begin, end) {
-  return test(function(ch) {
-    return begin <= ch && ch <= end;
-  }).desc(begin + '-' + end);
-}
-
-function takeWhile(predicate) {
-  assertFunction(predicate);
-
-  return Parsimmon(function(input, i) {
-    var j = i;
-    while (j < input.length && predicate(input.charAt(j))) {
-      j++;
-    }
-    return makeSuccess(j, input.slice(i, j));
-  });
-}
-
-function lazy(desc, f) {
-  if (arguments.length < 2) {
-    f = desc;
-    desc = undefined;
-  }
-
-  var parser = Parsimmon(function(input, i) {
-    parser._ = f()._;
-    return parser._(input, i);
-  });
-
-  if (desc) {
-    return parser.desc(desc);
-  } else {
-    return parser;
-  }
-}
-
-// -*- Fantasy Land Extras -*-
-
-function empty() {
-  return fail('fantasy-land/empty');
-}
-
-_.concat = _.or;
-_.empty = empty;
-_.of = succeed;
-_['fantasy-land/ap'] = _.ap;
-_['fantasy-land/chain'] = _.chain;
-_['fantasy-land/concat'] = _.concat;
-_['fantasy-land/empty'] = _.empty;
-_['fantasy-land/of'] = _.of;
-_['fantasy-land/map'] = _.map;
-
-// -*- Base Parsers -*-
-
-var index = Parsimmon(function(input, i) {
-  return makeSuccess(i, makeLineColumnIndex(input, i));
-});
-
-var any = Parsimmon(function(input, i) {
-  if (i >= input.length) {
-    return makeFailure(i, 'any character');
-  }
-  return makeSuccess(i + 1, input.charAt(i));
-});
-
-var all = Parsimmon(function(input, i) {
-  return makeSuccess(input.length, input.slice(i));
-});
-
-var eof = Parsimmon(function(input, i) {
-  if (i < input.length) {
-    return makeFailure(i, 'EOF');
-  }
-  return makeSuccess(i, null);
-});
-
-var digit = regexp(/[0-9]/).desc('a digit');
-var digits = regexp(/[0-9]*/).desc('optional digits');
-var letter = regexp(/[a-z]/i).desc('a letter');
-var letters = regexp(/[a-z]*/i).desc('optional letters');
-var optWhitespace = regexp(/\s*/).desc('optional whitespace');
-var whitespace = regexp(/\s+/).desc('whitespace');
-
-Parsimmon.all = all;
-Parsimmon.alt = alt;
-Parsimmon.any = any;
-Parsimmon.createLanguage = createLanguage;
-Parsimmon.custom = custom;
-Parsimmon.digit = digit;
-Parsimmon.digits = digits;
-Parsimmon.empty = empty;
-Parsimmon.eof = eof;
-Parsimmon.fail = fail;
-Parsimmon.formatError = formatError;
-Parsimmon.index = index;
-Parsimmon.isParser = isParser;
-Parsimmon.lazy = lazy;
-Parsimmon.letter = letter;
-Parsimmon.letters = letters;
-Parsimmon.lookahead = lookahead;
-Parsimmon.makeFailure = makeFailure;
-Parsimmon.makeSuccess = makeSuccess;
-Parsimmon.noneOf = noneOf;
-Parsimmon.notFollowedBy = notFollowedBy;
-Parsimmon.of = succeed;
-Parsimmon.oneOf = oneOf;
-Parsimmon.optWhitespace = optWhitespace;
-Parsimmon.Parser = Parsimmon;
-Parsimmon.range = range;
-Parsimmon.regex = regexp;
-Parsimmon.regexp = regexp;
-Parsimmon.sepBy = sepBy;
-Parsimmon.sepBy1 = sepBy1;
-Parsimmon.seq = seq;
-Parsimmon.seqMap = seqMap;
-Parsimmon.seqObj = seqObj;
-Parsimmon.string = string;
-Parsimmon.succeed = succeed;
-Parsimmon.takeWhile = takeWhile;
-Parsimmon.test = test;
-Parsimmon.whitespace = whitespace;
-Parsimmon['fantasy-land/empty'] = empty;
-Parsimmon['fantasy-land/of'] = succeed;
-
-module.exports = Parsimmon;
-
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.aliases = {\n    \"mathfrak\": \"frak\",\n    \"mathcal\": \"cal\",\n    \"mathbb\": \"bb\",\n    \"mathbf\": \"bf\",\n    \"dfrac\": \"frac\",\n    \"ldots\": \"dots\"\n};\n//# sourceMappingURL=command-aliases.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/command-aliases.js?");
 
 /***/ }),
-/* 8 */
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/convert.js":
+/*!************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/convert.js ***!
+  \************************************************************************/
+/*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-function unknownCommandError(cmd) {
-    return new Error("I do not know command " + cmd);
-}
-exports.unknownCommandError = unknownCommandError;
-//# sourceMappingURL=unknown-command.js.map
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar options_1 = __webpack_require__(/*! ./options */ \"./node_modules/latex-to-unicode-converter/ts-compiled/options.js\");\nvar latex_parser_1 = __webpack_require__(/*! latex-parser */ \"./node_modules/latex-parser/main.js\");\nvar convert_1 = __webpack_require__(/*! ./unicode/convert */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/convert.js\");\nfunction convertLaTeX(options, src) {\n    return convertLaTeXBlocks(options, latex_parser_1.mustNotBeUndefined(latex_parser_1.mustBeOk(latex_parser_1.latexParser.parse(src)).value));\n}\nexports.convertLaTeX = convertLaTeX;\nfunction convertLaTeXToUnicode(src) {\n    return convertLaTeXBlocks({\n        translateTo: \"unicode\",\n        mode: \"Any\",\n    }, latex_parser_1.mustNotBeUndefined(latex_parser_1.mustBeOk(latex_parser_1.latexParser.parse(src)).value));\n}\nexports.convertLaTeXToUnicode = convertLaTeXToUnicode;\nfunction convertLaTeXBlocks(options, latex) {\n    var translateTo = options.translateTo;\n    switch (translateTo) {\n        case \"html\":\n            throw new Error(\"Unsupported format: '\"\n                + translateTo\n                + \"'. Use one of: \"\n                + Object.keys(options_1.supportedMarkups));\n        case \"unicode\":\n        default:\n            return convert_1.convertLaTeXBlocksToUnicode(options, latex).result;\n    }\n}\nexports.convertLaTeXBlocks = convertLaTeXBlocks;\n//# sourceMappingURL=convert.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/convert.js?");
 
 /***/ }),
-/* 9 */
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/diacritic.js":
+/*!***********************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/diacritic.js ***!
+  \***********************************************************************************************/
+/*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-function createCommandHandler(name, optionalArguments, argumentCount, apply) {
-    return { name: name, optionalArguments: optionalArguments, argumentCount: argumentCount, apply: apply };
-}
-exports.createCommandHandler = createCommandHandler;
-function createKnownCommandWithOptArgs(name, optionalArguments, argumentCount) {
-    return { name: name, optionalArguments: optionalArguments, argumentCount: argumentCount };
-}
-exports.createKnownCommandWithOptArgs = createKnownCommandWithOptArgs;
-function createKnownCommandWithArgs(name, argumentCount) {
-    return {
-        name: name,
-        optionalArguments: 0,
-        argumentCount: argumentCount
-    };
-}
-exports.createKnownCommandWithArgs = createKnownCommandWithArgs;
-//# sourceMappingURL=KnownCommand.js.map
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.diacriticsTextMode = {\n    \"`\": true,\n    \"'\": true,\n    \"^\": true,\n    \"~\": true,\n    \"=\": true,\n    \".\": true,\n    '\"': true,\n    \"H\": true,\n    \"c\": true,\n    \"k\": true,\n    \"b\": true,\n    \"d\": true,\n    \"r\": true,\n    \"u\": true,\n    \"v\": true,\n};\nexports.diacriticsMathMode = {\n    \"hat\": true,\n    \"widehat\": true,\n    \"check\": true,\n    \"tilde\": true,\n    \"widetilde\": true,\n    \"acute\": true,\n    \"grave\": true,\n    \"dot\": true,\n    \"ddot\": true,\n    \"breve\": true,\n    \"bar\": true,\n    \"vec\": true,\n    \"mathring\": true,\n};\n//# sourceMappingURL=diacritic.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/diacritic.js?");
 
 /***/ }),
-/* 10 */
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/formatting.js":
+/*!************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/formatting.js ***!
+  \************************************************************************************************/
+/*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.formattingText = {
-    textbb: true,
-    textbf: true,
-    textfrak: true,
-    textit: true,
-    texttt: true,
-    textcal: true,
-    textsup: true,
-    textsub: true,
-    textsuperscript: true,
-    textsubscript: true,
-};
-exports.formattingNoMode = {
-    bb: true,
-    bf: true,
-    frak: true,
-    it: true,
-    tt: true,
-    cal: true,
-    mono: true,
-    sup: true,
-    sub: true,
-    superscript: true,
-    subscript: true,
-};
-exports.formattingMath = {
-    mathbb: true,
-    mathbf: true,
-    mathfrak: true,
-    mathit: true,
-    mathtt: true,
-    mathcal: true,
-    mathsup: true,
-    mathsub: true,
-    mathsuperscript: true,
-    mathsubscript: true,
-};
-function isBbCmd(x) {
-    return x === "bb" || x === "mathbb" || x === "textbb";
-}
-exports.isBbCmd = isBbCmd;
-function isBfCmd(x) {
-    return x === "bf" || x === "mathbf" || x === "textbf";
-}
-exports.isBfCmd = isBfCmd;
-function isMonoCmd(x) {
-    return x === "mono";
-}
-exports.isMonoCmd = isMonoCmd;
-function isFrakCmd(x) {
-    return x === "frak" || x === "mathfrak" || x === "textfrak";
-}
-exports.isFrakCmd = isFrakCmd;
-function isItCmd(x) {
-    return x === "it" || x === "mathit" || x === "textit";
-}
-exports.isItCmd = isItCmd;
-function isTtCmd(x) {
-    return x === "tt" || x === "mathtt" || x === "texttt";
-}
-exports.isTtCmd = isTtCmd;
-function isCalCmd(x) {
-    return x === "cal" || x === "mathcal" || x === "textcal";
-}
-exports.isCalCmd = isCalCmd;
-function isSupCmd(x) {
-    return x === "sup"
-        || x === "mathsup"
-        || x === "textsup"
-        || x === "superscript"
-        || x === "mathsuperscript"
-        || x === "textsuperscript";
-}
-exports.isSupCmd = isSupCmd;
-function isSubCmd(x) {
-    return x === "sub"
-        || x === "mathsub"
-        || x === "textsub"
-        || x === "subscript"
-        || x === "mathsubscript"
-        || x === "textsubscript";
-}
-exports.isSubCmd = isSubCmd;
-function isFormattingCmd(x) {
-    return exports.formattingText.hasOwnProperty(x) ||
-        exports.formattingMath.hasOwnProperty(x) ||
-        exports.formattingNoMode.hasOwnProperty(x);
-}
-exports.isFormattingCmd = isFormattingCmd;
-//# sourceMappingURL=formatting.js.map
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.formattingText = {\n    textbb: true,\n    textbf: true,\n    textfrak: true,\n    textit: true,\n    texttt: true,\n    textcal: true,\n    textsup: true,\n    textsub: true,\n    textsuperscript: true,\n    textsubscript: true,\n};\nexports.formattingNoMode = {\n    bb: true,\n    bf: true,\n    frak: true,\n    it: true,\n    tt: true,\n    cal: true,\n    mono: true,\n    sup: true,\n    sub: true,\n    superscript: true,\n    subscript: true,\n};\nexports.formattingMath = {\n    mathbb: true,\n    mathbf: true,\n    mathfrak: true,\n    mathit: true,\n    mathtt: true,\n    mathcal: true,\n    mathsup: true,\n    mathsub: true,\n    mathsuperscript: true,\n    mathsubscript: true,\n};\nfunction isBbCmd(x) {\n    return x === \"bb\" || x === \"mathbb\" || x === \"textbb\";\n}\nexports.isBbCmd = isBbCmd;\nfunction isBfCmd(x) {\n    return x === \"bf\" || x === \"mathbf\" || x === \"textbf\";\n}\nexports.isBfCmd = isBfCmd;\nfunction isMonoCmd(x) {\n    return x === \"mono\";\n}\nexports.isMonoCmd = isMonoCmd;\nfunction isFrakCmd(x) {\n    return x === \"frak\" || x === \"mathfrak\" || x === \"textfrak\";\n}\nexports.isFrakCmd = isFrakCmd;\nfunction isItCmd(x) {\n    return x === \"it\" || x === \"mathit\" || x === \"textit\";\n}\nexports.isItCmd = isItCmd;\nfunction isTtCmd(x) {\n    return x === \"tt\" || x === \"mathtt\" || x === \"texttt\";\n}\nexports.isTtCmd = isTtCmd;\nfunction isCalCmd(x) {\n    return x === \"cal\" || x === \"mathcal\" || x === \"textcal\";\n}\nexports.isCalCmd = isCalCmd;\nfunction isSupCmd(x) {\n    return x === \"sup\"\n        || x === \"mathsup\"\n        || x === \"textsup\"\n        || x === \"superscript\"\n        || x === \"mathsuperscript\"\n        || x === \"textsuperscript\";\n}\nexports.isSupCmd = isSupCmd;\nfunction isSubCmd(x) {\n    return x === \"sub\"\n        || x === \"mathsub\"\n        || x === \"textsub\"\n        || x === \"subscript\"\n        || x === \"mathsubscript\"\n        || x === \"textsubscript\";\n}\nexports.isSubCmd = isSubCmd;\nfunction isFormattingCmd(x) {\n    return exports.formattingText.hasOwnProperty(x) ||\n        exports.formattingMath.hasOwnProperty(x) ||\n        exports.formattingNoMode.hasOwnProperty(x);\n}\nexports.isFormattingCmd = isFormattingCmd;\n//# sourceMappingURL=formatting.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/formatting.js?");
 
 /***/ }),
-/* 11 */
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/index.js":
+/*!*******************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/index.js ***!
+  \*******************************************************************************************/
+/*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.superscriptCharacters = {
-    "0": "⁰",
-    "1": "¹",
-    "2": "²",
-    "3": "³",
-    "4": "⁴",
-    "5": "⁵",
-    "6": "⁶",
-    "7": "⁷",
-    "8": "⁸",
-    "9": "⁹",
-    "+": "⁺",
-    "-": "⁻",
-    "=": "⁼",
-    "(": "⁽",
-    ")": "⁾",
-    "a": "ᵃ",
-    "b": "ᵇ",
-    "c": "ᶜ",
-    "d": "ᵈ",
-    "e": "ᵉ",
-    "f": "ᶠ",
-    "g": "ᵍ",
-    "h": "ʰ",
-    "i": "ⁱ",
-    "j": "ʲ",
-    "k": "ᵏ",
-    "l": "ˡ",
-    "m": "ᵐ",
-    "n": "ⁿ",
-    "o": "ᵒ",
-    "p": "ᵖ",
-    "r": "ʳ",
-    "s": "ˢ",
-    "t": "ᵗ",
-    "u": "ᵘ",
-    "v": "ᵛ",
-    "w": "ʷ",
-    "x": "ˣ",
-    "y": "ʸ",
-    "z": "ᶻ",
-    "A": "ᴬ",
-    "B": "ᴮ",
-    "D": "ᴰ",
-    "E": "ᴱ",
-    "G": "ᴳ",
-    "H": "ᴴ",
-    "I": "ᴵ",
-    "J": "ᴶ",
-    "K": "ᴷ",
-    "L": "ᴸ",
-    "M": "ᴹ",
-    "N": "ᴺ",
-    "O": "ᴼ",
-    "P": "ᴾ",
-    "R": "ᴿ",
-    "T": "ᵀ",
-    "U": "ᵁ",
-    "V": "ⱽ",
-    "W": "ᵂ",
-    "α": "ᵅ",
-    "β": "ᵝ",
-    "γ": "ᵞ",
-    "δ": "ᵟ",
-    "∊": "ᵋ",
-    "θ": "ᶿ",
-    "ι": "ᶥ",
-    "Φ": "ᶲ",
-    "φ": "ᵠ",
-    "χ": "ᵡ"
-};
-function isSuperscriptCharacter(x) {
-    return exports.superscriptCharacters.hasOwnProperty(x);
-}
-exports.isSuperscriptCharacter = isSuperscriptCharacter;
-exports.translateCharToSuperscript = function (char) { return isSuperscriptCharacter(char) ? exports.superscriptCharacters[char] : undefined; };
-//# sourceMappingURL=superscript.js.map
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar space_1 = __webpack_require__(/*! ./space */ \"./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/space.js\");\nvar diacritic_1 = __webpack_require__(/*! ./diacritic */ \"./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/diacritic.js\");\nvar formatting_1 = __webpack_require__(/*! ./formatting */ \"./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/formatting.js\");\nvar runes_1 = __webpack_require__(/*! ../../../unicode/commands/1args/symbols/runes */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/symbols/runes.js\");\nexports.oneArgsCommands = Object.assign({}, space_1.spaceCmds1arg, formatting_1.formattingText, formatting_1.formattingMath, formatting_1.formattingNoMode, diacritic_1.diacriticsTextMode, diacritic_1.diacriticsMathMode, runes_1.runesMap, {\n    \"cyrchar\": true,\n    \"vec\": true,\n    \"mono\": true,\n    \"ding\": true,\n    \"dingbat\": true,\n    \"ElsevierGlyph\": true,\n    \"elsevierglyph\": true,\n    \"elsevier\": true,\n    \"Elsevier\": true,\n});\nfunction is1argsCommand(name) {\n    return exports.oneArgsCommands.hasOwnProperty(name);\n}\nexports.is1argsCommand = is1argsCommand;\n//# sourceMappingURL=index.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/index.js?");
 
 /***/ }),
-/* 12 */
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/space.js":
+/*!*******************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/space.js ***!
+  \*******************************************************************************************/
+/*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.runesMap = {
-    "ra": {
-        "\\ae": "ᚨ",
-        "\\c": {
-            unicode: "ᚳ",
-            note: "approximation",
-        },
-        "\\d": {
-            unicode: "ᛞ",
-            note: "approximation",
-        },
-        "\\ea": "ᛠ",
-        "\\G": "ᚸ",
-        "\\g": {
-            unicode: "ᚸ",
-            note: "approximation",
-        },
-        "\\h": "ᚬ",
-        "\\j": "ᛄ",
-        "\\k": "ᛤ",
-        "\\ng": "ᛝ",
-        "\\OE": {
-            unicode: "ᛟ",
-            note: "approximation",
-        },
-        "\\oe": "ᛟ",
-        "\\rex": {
-            unicode: "𐎟",
-            note: "approximation",
-        },
-        "\\seight": {
-            unicode: "⦚",
-            note: "approximation",
-        },
-        "\\sfive": {
-            unicode: "⦚",
-            note: "approximation",
-        },
-        "\\sfour": {
-            unicode: "⦚",
-            note: "approximation",
-        },
-        "\\sseven": {
-            unicode: "⦚",
-            note: "approximation",
-        },
-        "\\ssix": {
-            unicode: "⦚",
-            note: "approximation",
-        },
-        "\\stan": {
-            unicode: "ᛥ",
-            note: "approximation",
-        },
-        "\\STAN": "ᛥ",
-        "\\sthree": "ᛊ",
-        "\\th": "ᚦ",
-        "\\y": {
-            unicode: "ᚤ",
-            note: "approximation",
-        },
-        "a": "ᚪ",
-        "B": {
-            unicode: "ᛒ",
-            note: "approximation",
-        },
-        "b": "ᛒ",
-        "c": "ᚳ",
-        "D": {
-            unicode: "ᛞ",
-            note: "approximation",
-        },
-        "d": "ᛞ",
-        "e": "ᛖ",
-        "F": {
-            unicode: "ᚠ",
-            note: "approximation",
-        },
-        "f": "ᚠ",
-        "g": "ᚷ",
-        "H": {
-            unicode: "ᚺ",
-            note: "approximation",
-        },
-        "h": "ᚻ",
-        "i": "ᛁ",
-        "I": {
-            unicode: "ᛇ",
-            "latex2": "\\\"i"
-        },
-        "\\\"i": "ᛇ",
-        "J": {
-            unicode: "+",
-            note: "approximation",
-        },
-        "j": "ᚼ",
-        "k": "ᚲ",
-        "l": "ᛚ",
-        "m": "ᛗ",
-        "n": "ᚾ",
-        "o": "ᚩ",
-        "P": {
-            unicode: "⥏",
-            note: "approximation",
-        },
-        "p": "ᛈ",
-        "q": "ᛢ",
-        "r": "ᚱ",
-        "S": {
-            unicode: "⦚",
-            note: "approximation",
-        },
-        "s": "ᛋ",
-        "t": "ᛏ",
-        "U": {
-            unicode: "Λ",
-            note: "approximation",
-        },
-        "u": "ᚢ",
-        "w": "ᚹ",
-        "x": "ᛉ",
-        "Y": {
-            unicode: "ᚥ",
-            note: "approximation",
-        },
-        "y": {
-            unicode: "ᚣ",
-            note: "approximation",
-        }
-    },
-    "rc": {
-        "\\A": "ᚼ",
-        "\\a": {
-            unicode: "┝",
-            note: "approximation",
-        },
-        "\\d": {
-            unicode: "⋈",
-            note: "approximation",
-        },
-        "\\h": "ᚻ",
-        "\\i": {
-            unicode: "⥍",
-            note: "approximation",
-        },
-        "\\ing": {
-            unicode: "ᛄ",
-            note: "approximation",
-        },
-        "\\Ing": {
-            unicode: "ᛄ",
-            note: "approximation",
-        },
-        "\\ING": "ᛄ",
-        "\\j": {
-            unicode: "ᛃ",
-            note: "approximation",
-        },
-        "\\k": {
-            unicode: "⌵",
-            note: "approximation",
-        },
-        "\\K": {
-            unicode: "Υ",
-            note: "approximation",
-        },
-        "\\ng": "ᛜ",
-        "\\NG": {
-            unicode: "⸋",
-            note: "approximation",
-        },
-        "\\p": {
-            unicode: "ᛒ", note: "but with dot in lower"
-        },
-        "\\R": "ᛦ",
-        "\\RR": {
-            unicode: "ᛯ",
-            note: "approximation",
-        },
-        "\\s": "ᛋ",
-        "\\S": "ᛋ",
-        "\\seight": {
-            unicode: "⦚",
-            note: "approximation",
-        },
-        "\\sfive": {
-            unicode: "⦚",
-            note: "approximation",
-        },
-        "\\sseven": {
-            unicode: "⦚",
-            note: "approximation",
-        },
-        "\\sthree": {
-            unicode: "⦚",
-            note: "approximation",
-        },
-        "\\th": "ᚦ",
-        "a": "ᚨ",
-        "A": "ᛋ",
-        "b": "ᛒ",
-        "B": {
-            unicode: "ᛒ",
-            note: "approximation",
-        },
-        "d": "ᛞ",
-        "D": {
-            unicode: "▯",
-            note: "approximation",
-        },
-        "e": "ᛖ",
-        "E": {
-            unicode: "⨅",
-            note: "approximation",
-        },
-        "f": {
-            unicode: "ᚠ",
-            note: "but skinny"
-        },
-        "F": "ᚠ",
-        "g": "ᚷ",
-        "h": "ᚺ",
-        "H": {
-            unicode: "𝖭",
-            note: "approximation",
-        },
-        "i": "ᛁ",
-        "I": {
-            unicode: "⥌",
-            note: "approximation",
-        }, "\\\"i": {
-            unicode: "⥌",
-            note: "approximation",
-        },
-        "j": "ᛃ",
-        "J": {
-            unicode: "ϟ",
-            note: "but with box"
-        },
-        "k": "ᚲ",
-        "K": {
-            unicode: "Ⴤ",
-            note: "approximation",
-        },
-        "l": "ᛚ",
-        "m": "ᛗ",
-        "n": "ᚾ",
-        "o": "ᛟ",
-        "p": "ᛈ",
-        "P": {
-            unicode: "P",
-            note: "approximation",
-        },
-        "r": "ᚱ",
-        "R": "ᛉ",
-        "s": "ᛊ",
-        "\\sfour": "ᛊ",
-        "S": {
-            unicode: "⦚",
-            note: "approximation",
-        },
-        "t": "ᛏ",
-        "T": {
-            unicode: "ᛏ",
-            note: "approximation",
-        },
-        "u": "ᚢ",
-        "U": {
-            unicode: "Λ",
-            note: "approximation",
-        },
-        "w": "ᚹ"
-    },
-    "rm": {
-        "\\a": "ᛆ", ".a": "ᛆ",
-        "\\adot": {
-            note: "ᛂ+ᛅ",
-        }, "'a": {
-            note: "ᛂ+ᛅ",
-        },
-        "\\c": "ᛍ", ".c": "ᛍ",
-        "\\D": {
-            note: "Arrow with two dots",
-        }, "T": {
-            note: "Arrow with two dots",
-        },
-        "\\e": {
-            unicode: "⟊",
-            note: "approximation",
-        }, "=i": {
-            unicode: "⟊",
-            note: "approximation",
-        },
-        "\\g": {
-            unicode: "?",
-            note: "approximation",
-        }, "=k": {
-            unicode: "?",
-            note: "approximation",
-        },
-        "\\h": {
-            unicode: "⚹",
-            note: "approximation",
-        },
-        "\\l": "ᛛ", ".l": "ᛛ",
-        "\\lbar": {
-            note: "ᛚ with bar",
-        }, "=l": {
-            note: "ᛚ with bar",
-        },
-        "\\ldot": {
-            note: "ᛚ with dot",
-        }, "'l": {
-            note: "ᛚ with dot",
-        },
-        "\\lflag": {
-            note: "ᛚ with flag",
-        }, "~l": {
-            note: "ᛚ with flag",
-        },
-        "\\lring": {
-            note: "ᛚ with ring",
-        }, "^l": {
-            note: "ᛚ with ring",
-        },
-        "\\m": {
-            unicode: "ᚴ",
-            note: "but mirrored"
-        },
-        "\\n": {
-            unicode: "ᛀ",
-            note: "approximation",
-        }, ".n": {
-            unicode: "ᛀ",
-            note: "approximation",
-        },
-        "\\N": "ᛀ", ".N": "ᛀ",
-        "\\ndot": {
-            note: "ᚿ+ᛀ",
-        }, "'n": {
-            note: "ᚿ+ᛀ",
-        },
-        "\\p": {
-            unicode: "ᛒ",
-            note: "but with dot in lower"
-        }, ".b": {
-            unicode: "ᛒ",
-            note: "but with dot in lower"
-        },
-        "\\P": "ᛕ",
-        "\\Pdots": {
-            note: "ᛕ with dots",
-        },
-        "\\q": {
-            note: "ᚴ mirrored",
-        },
-        "\\Q": {
-            note: "ᛕ mirrored",
-        },
-        "\\r": {
-            unicode: "?",
-            note: "approximation",
-        },
-        "\\rdot": {
-            note: "ᚱ with dot",
-        }, ".r": {
-            note: "ᚱ with dot",
-        },
-        "\\tbar": {
-            unicode: "ᛑ",
-            note: "but with bar"
-        }, "=t": {
-            unicode: "ᛑ",
-            note: "but with bar"
-        },
-        "\\tdot": {
-            unicode: "ᛑ",
-            note: "but dot translated upper left"
-        }, "'t": {
-            unicode: "ᛑ",
-            note: "but dot translated upper left"
-        },
-        "\\tflag": {
-            unicode: "ᛑ",
-            note: "but with flag"
-        }, "~t": {
-            unicode: "ᛑ",
-            note: "but with flag"
-        },
-        "\\tring": {
-            unicode: "ᛑ",
-            note: "but with ring"
-        }, "^t": {
-            unicode: "ᛑ",
-            note: "but with ring"
-        },
-        "a": "ᛆ",
-        "A": {
-            unicode: "ᛆ",
-            note: "but with bigger leg"
-        },
-        "b": "ᛒ",
-        "B": {
-            unicode: "ᛒ",
-            note: "but like b"
-        },
-        "c": "ᛌ",
-        "C": {
-            unicode: "ᛍ",
-            note: "approximation",
-        }, "^c": {
-            unicode: "ᛍ",
-            note: "approximation",
-        },
-        "d": "ᛑ", ".t": "ᛑ",
-        "D": {
-            note: "ᛏ+ᛂ",
-        }, ".T": {
-            note: "ᛏ+ᛂ",
-        },
-        "e": "ᛂ", ".i": "ᛂ",
-        "E": {
-            unicode: "ᛂ",
-            note: "but with ring"
-        }, "^i": {
-            unicode: "ᛂ",
-            note: "but with ring"
-        },
-        "f": "ᚠ",
-        "F": {
-            note: "ᚠ with extra branch",
-        },
-        "g": "ᚵ", ".k": "ᚵ",
-        "G": {
-            unicode: "ᚵ",
-            note: "but dot translated bottom left"
-        }, "'k": {
-            unicode: "ᚵ",
-            note: "but dot translated bottom left"
-        },
-        "h": "ᚼ",
-        "H": {
-            unicode: "✳",
-            note: "approximation",
-        },
-        "i": "ᛧ",
-        "k": "ᚴ",
-        "l": "ᛚ",
-        "m": "ᛘ",
-        "n": "ᚿ",
-        "N": "ᚾ",
-        "o": "ᚮ",
-        "p": "ᛔ",
-        "P": "ᚹ",
-        "q": {
-            note: "ᚹ mirrored",
-        },
-        "r": "ᚱ"
-    },
-    "rn": {
-        ".i": "ᛂ", "e": "ᛂ",
-        ".k": "ᚵ", "g": "ᚵ",
-        ".u": "ᚤ", "y": "ᚤ",
-        "\\m": {
-            note: "ᛘ with dots",
-        },
-        "M": {
-            note: "⫯ with plus",
-        }, "\\M": {
-            note: "⫯ with plus",
-        },
-        "\\A": "ᚬ",
-        "\\bar": {
-            unicode: "❘",
-            note: "approximation",
-        }, "!": {
-            unicode: "❘",
-            note: "approximation",
-        },
-        "\\cross": "⨯", "*": "⨯",
-        "\\dot": "᛫", ".": "᛫",
-        "\\doublebar": "¦",
-        "\\doublecross": {
-            note: "two stacked x's",
-        },
-        "\\doubledot": "᛬", ":": "᛬",
-        "\\doubleeye": "᛬",
-        "\\doubleplus": {
-            unicode: "‡",
-            note: "approximation",
-        },
-        "\\eye": "᛫",
-        "\\pentdot": {
-            unicode: "⹘",
-            note: "proposal",
-        },
-        "\\penteye": "⸭",
-        "\\plus": "᛭", "+": "᛭",
-        "\\quaddot": "⁞",
-        "\\quadeye": {
-            unicode: "⁘",
-            note: "approximation",
-        },
-        "\\star": {
-            unicode: "*",
-            note: "approximation",
-        },
-        "\\th": "ᚦ",
-        "\\TH": {
-            unicode: "ᚦ",
-            note: "approximation",
-        },
-        "\\triplebar": "┆",
-        "\\triplecross": {
-            note: "three stacked x's",
-        },
-        "\\tripledot": "⁝",
-        "\\tripleeye": "⋮",
-        "\\tripleplus": {
-            note: "three stacked plusses",
-        },
-        "A": "ᚭ",
-        "a": "ᛅ",
-        "b": "ᛒ",
-        "B": {
-            unicode: "ᛒ",
-            note: "but skinny"
-        },
-        "f": "ᚠ",
-        "F": {
-            unicode: "ᚠ",
-            note: "but skinny"
-        },
-        "h": "ᚼ",
-        "i": "ᛁ",
-        "k": "ᚴ",
-        "l": "ᛚ",
-        "m": "ᛘ",
-        "n": "ᚾ",
-        "r": "ᚱ",
-        "R": "ᛣ",
-        "s": "ᛋ",
-        "S": {
-            unicode: "𝗁",
-            note: "but with sharp corner",
-        },
-        "t": "ᛏ",
-        "u": {
-            "latex1": "u"
-        }
-    },
-    "rt": {},
-    "rl": {
-        "\\A": {
-            unicode: "ߌ",
-            note: "approximation"
-        },
-        "\\th": "ᛧ",
-        "A": {
-            unicode: "`",
-            note: "approximation"
-        },
-        "a": {
-            unicode: "´",
-            note: "approximation"
-        },
-        "b": {
-            unicode: "´",
-            note: "approximation"
-        },
-        "f": {
-            unicode: "ߌ",
-            note: "approximation"
-        },
-        "h": "ᛙ",
-        "i": "ᛁ",
-        "k": "ᛍ",
-        "l": {
-            unicode: "`",
-            note: "approximation"
-        },
-        "m": {
-            unicode: ":",
-            note: "approximation"
-        },
-        "n": {
-            unicode: "`",
-            note: "approximation"
-        },
-        "r": {
-            unicode: "⎧",
-            note: "approximation"
-        },
-        "R": {
-            unicode: ":",
-            note: "approximation"
-        },
-        "s": "ᛧ",
-        "t": {
-            unicode: "´",
-            note: "approximation"
-        },
-        "u": {
-            unicode: "⎫",
-            note: "approximation"
-        }
-    }
-};
-exports.isRuneType = function (x) { return exports.runesMap.hasOwnProperty(x); };
-exports.runeUnicode = function (type, innerLatex) {
-    var runesType = exports.runesMap[type];
-    if (!runesType)
-        return undefined;
-    var found = runesType[innerLatex];
-    if (typeof found === "string")
-        return found;
-    if (found.unicode)
-        return found.unicode;
-    return undefined;
-};
-//# sourceMappingURL=runes.js.map
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.spaceCmds1arg = {\n    kern: true,\n    hskip: true,\n    hspace: true,\n    hphantom: true,\n};\n//# sourceMappingURL=space.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/space.js?");
 
 /***/ }),
-/* 13 */
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/2args/frac.js":
+/*!******************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/2args/frac.js ***!
+  \******************************************************************************************/
+/*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var space_1 = __webpack_require__(56);
-var diacritic_1 = __webpack_require__(57);
-var formatting_1 = __webpack_require__(10);
-var runes_1 = __webpack_require__(12);
-exports.oneArgsCommands = Object.assign({}, space_1.spaceCmds1arg, formatting_1.formattingText, formatting_1.formattingMath, formatting_1.formattingNoMode, diacritic_1.diacriticsTextMode, diacritic_1.diacriticsMathMode, runes_1.runesMap, {
-    "cyrchar": true,
-    "vec": true,
-    "mono": true,
-    "ding": true,
-    "dingbat": true,
-    "ElsevierGlyph": true,
-    "elsevierglyph": true,
-    "elsevier": true,
-    "Elsevier": true,
-});
-function is1argsCommand(name) {
-    return exports.oneArgsCommands.hasOwnProperty(name);
-}
-exports.is1argsCommand = is1argsCommand;
-//# sourceMappingURL=index.js.map
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.fracCmds = {\n    \"frac\": true,\n    \"nfrac\": true,\n    \"cfrac\": true,\n    \"xfrac\": true,\n    \"sfrac\": true,\n};\nfunction isFracCmd(x) {\n    return exports.fracCmds.hasOwnProperty(x);\n}\nexports.isFracCmd = isFracCmd;\n//# sourceMappingURL=frac.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/2args/frac.js?");
 
 /***/ }),
-/* 14 */
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/2args/index.js":
+/*!*******************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/2args/index.js ***!
+  \*******************************************************************************************/
+/*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-
-
-var fs = __webpack_require__(15);
-var path = __webpack_require__(16);
-var bibtex = __webpack_require__(17);
-var converter = __webpack_require__(18);
-
-//
-// ARGS
-//
-
-if (process.argv.length < 4) {
-    console.error('Usage: bib2hugo inputBib outputFolder [configJSON]');
-    process.exit();
-}
-
-var input = process.argv[2];
-var outputFolder = process.argv[3];
-
-try {
-    fs.accessSync(outputFolder);
-} catch (e) {
-    fs.mkdirSync(outputFolder);
-}
-
-var config = {};
-if (process.argv[4]) {
-    try {
-        config = JSON.parse(fs.readFileSync(process.argv[4]).toString());
-    } catch (e) {
-        console.log('Unable to open config file <' + process.argv[4] + '>, continuing with defaults...');
-    }
-}
-
-var params = Object.assign({}, {
-    pdfLink: 'pdf',
-    pptLink: 'presentation',
-    typeMap: {
-        article: '0',
-        incollection: '1',
-        inproceedings: '2',
-        phdthesis: '3',
-        mastersthesis: '4',
-        proceedings: '5',
-        book: '6',
-        techreport: '7',
-        misc: '8'
-    }
-}, config);
-
-//
-// SHARED STUFF
-//
-
-function convert(val) {
-    return converter.convertLaTeX({
-        onError: function onError(error, latex) {
-            return latex;
-        }
-    }, val);
-}
-
-function str(val) {
-    var ret = val || '';
-    ret = ret.replace(/\\&/g, '&');
-    ret = ret.replace(/\\%/g, '%');
-    ret = ret.replace(/\\#/g, '#');
-    ret = ret.replace(/--/g, '–');
-    ret = convert(ret);
-    return ret;
-}
-
-function authorize(name) {
-    return str(name.split(',').map(function (e) {
-        return e.trim();
-    }).reverse().join(' '));
-}
-
-function abstractize(val) {
-    return str(val).replace(/(?:\r\n|\r|\n)/g, '<br />').replace(/"/g, '\\"');
-}
-
-function findFile(folder, needle) {
-    var pattern = new RegExp('^(.*[^a-zA-z0-9])?' + needle + '([^a-zA-Z0-9].*)?$');
-    var result = null;
-    try {
-        fs.readdirSync(folder).forEach(function (file) {
-            if (file.match(pattern)) {
-                result = file;
-                return false;
-            }
-        });
-    } catch (e) {
-        console.error('Unable to open folder <' + folder + '>');
-    }
-    return result;
-}
-
-var months = {
-    'jan': '01',
-    'feb': '02',
-    'mar': '03',
-    'apr': '04',
-    'may': '05',
-    'jun': '06',
-    'jul': '07',
-    'aug': '08',
-    'sep': '09',
-    'oct': '10',
-    'nov': '11',
-    'dec': '12'
-
-    //
-    // PROCESSING
-    //
-
-};var bib = bibtex.toJSON(fs.readFileSync(input).toString());
-var count = 0;
-
-bib.forEach(function (entry) {
-
-    var key = entry.citationKey;
-    var type = entry.entryType.toLowerCase();
-
-    // FILTERING
-
-    if (type == 'comment') return;
-
-    if (params.whitelist && params.whitelist.indexOf(key) === -1) {
-        console.log('Whitelist filtered: ' + key);
-        return;
-    }
-
-    if (params.blacklist && params.blacklist.indexOf(key) !== -1) {
-        console.log('Blacklist filtered: ' + key);
-        return;
-    }
-
-    console.log('Processing: ' + key);
-    count++;
-
-    // BASIC OUTPUT
-
-    var output = "+++\n";
-    output += 'title = "' + str(entry.entryTags.title) + '"\n';
-    var authorField = type == 'book' || type == 'proceedings' ? 'editor' : 'author';
-    var authors = entry.entryTags[authorField].split('and').map(function (name) {
-        return authorize(name);
-    });
-    output += 'authors = ' + JSON.stringify(authors) + '\n';
-    output += 'abstract = "' + abstractize(entry.entryTags.abstract || '') + '"\n';
-    output += 'date = "' + entry.entryTags.year + '-' + (months[entry.entryTags.month] || '01') + '-01"\n';
-
-    // LINKS
-
-    if (entry.entryTags.url) {
-        output += 'url_custom = [{name = "Online", url = "' + entry.entryTags.url + '"}]\n';
-    }
-
-    if (params.pdfFolder) {
-        var pdf = findFile(params.pdfFolder, key);
-        if (pdf) {
-            console.log('PDF link: ' + pdf);
-            output += 'url_pdf = "' + params.pdfLink + '/' + pdf + '"\n';
-        }
-    }
-
-    if (params.pptFolder) {
-        var ppt = findFile(params.pptFolder, key);
-        if (ppt) {
-            console.log('PPT link: ' + ppt);
-            output += 'url_slides = "' + params.pptLink + '/' + ppt + '"\n';
-        }
-    }
-
-    // TYPE DEPENDENT OUTPUT
-
-    var pagePlural = entry.entryTags.pages && entry.entryTags.pages.indexOf('-') !== -1 ? 's' : '';
-
-    if (type == 'inproceedings') {
-        output += 'publication = "' + str(entry.entryTags.booktitle) + ', ' + str(entry.entryTags.address) + ', ';
-        if (entry.entryTags.pages) {
-            output += 'Page' + pagePlural + ' ' + str(entry.entryTags.pages) + '"\n';
-        } else {
-            // if there is no "pages" for a conference paper, there'd better be an explanation
-            output += entry.entryTags.note + '"\n';
-        }
-    } else if (type == 'article') {
-        output += 'publication = "' + str(entry.entryTags.journal) + ', ' + str(entry.entryTags.volume) + (
-        // html entities for left/right parens to avoid incorrect markdownification
-        entry.entryTags.number ? '&#40;' + str(entry.entryTags.number) + '&#41;' : '') + ':' + str(entry.entryTags.pages) + '"\n';
-    } else if (type == 'incollection') {
-        output += 'publication = "' + str(entry.entryTags.booktitle) + ', ' + 'Page' + pagePlural + ' ' + str(entry.entryTags.pages) + '"\n';
-    } else if (type == 'book') {
-        output += 'publication = "' + str(entry.entryTags.series) + ', ' + str(entry.entryTags.volume) + (
-        // html entities for left/right parens to avoid incorrect markdownification
-        entry.entryTags.number ? '&#40;' + str(entry.entryTags.number) + '&#41;' : '') + '"\n';
-    }
-
-    var index = params.typeMap[type] || params.typeMap['misc'] || '0';
-    output += 'publication_types = ["' + index + '"]\n';
-
-    // BiBTeX OUTPUT
-
-    var max = Object.keys(entry.entryTags).reduce(function (a, b) {
-        return Math.max(a, b.length);
-    }, 0);
-
-    output += '+++\n\n';
-    output += 'BibTeX:\n';
-    output += '```tex\n';
-    output += '@' + entry.entryType + '{' + key + ',\n';
-    Object.keys(entry.entryTags).forEach(function (field) {
-        if (field == 'abstract') return;
-        if (field == 'month') {
-            output += '    ' + field.padEnd(max + 1) + '= ' + entry.entryTags[field] + ',\n';
-        } else {
-            output += '    ' + field.padEnd(max + 1) + '= {' + entry.entryTags[field] + '},\n';
-        }
-    });
-    output += '}\n';
-    output += '```\n';
-
-    // DONE
-
-    fs.writeFileSync(path.join(outputFolder, key + '.md'), output);
-});
-
-console.log('Done, processed ' + count + ' entries.');
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar frac_1 = __webpack_require__(/*! ./frac */ \"./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/2args/frac.js\");\nexports.twoArgsCommands = Object.assign({}, frac_1.fracCmds, {\n    \"binom\": true\n});\nfunction is2argsCommand(name) {\n    return exports.twoArgsCommands.hasOwnProperty(name);\n}\nexports.is2argsCommand = is2argsCommand;\n//# sourceMappingURL=index.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/2args/index.js?");
 
 /***/ }),
-/* 15 */
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/options.js":
+/*!************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/options.js ***!
+  \************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.supportedMarkups = {\n    \"ascii\": true,\n    \"unicode\": true,\n    \"html\": true\n};\n//# sourceMappingURL=options.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/options.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/tex/KnownCommand.js":
+/*!*********************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/tex/KnownCommand.js ***!
+  \*********************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nfunction createCommandHandler(name, optionalArguments, argumentCount, apply) {\n    return { name: name, optionalArguments: optionalArguments, argumentCount: argumentCount, apply: apply };\n}\nexports.createCommandHandler = createCommandHandler;\nfunction createKnownCommandWithOptArgs(name, optionalArguments, argumentCount) {\n    return { name: name, optionalArguments: optionalArguments, argumentCount: argumentCount };\n}\nexports.createKnownCommandWithOptArgs = createKnownCommandWithOptArgs;\nfunction createKnownCommandWithArgs(name, argumentCount) {\n    return {\n        name: name,\n        optionalArguments: 0,\n        argumentCount: argumentCount\n    };\n}\nexports.createKnownCommandWithArgs = createKnownCommandWithArgs;\n//# sourceMappingURL=KnownCommand.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/tex/KnownCommand.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/tex/KnownCommand0Args.js":
+/*!**************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/tex/KnownCommand0Args.js ***!
+  \**************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nfunction createKnownCommand(name) {\n    return {\n        name: name,\n        optionalArguments: 0,\n        argumentCount: 0\n    };\n}\nexports.createKnownCommand = createKnownCommand;\n//# sourceMappingURL=KnownCommand0Args.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/tex/KnownCommand0Args.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/tex/KnownCommand1Args.js":
+/*!**************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/tex/KnownCommand1Args.js ***!
+  \**************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nfunction createKnownCommandWith1Arg(name) {\n    return {\n        name: name,\n        optionalArguments: 0,\n        argumentCount: 1\n    };\n}\nexports.createKnownCommandWith1Arg = createKnownCommandWith1Arg;\n//# sourceMappingURL=KnownCommand1Args.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/tex/KnownCommand1Args.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/barred-letter.js":
+/*!*****************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/barred-letter.js ***!
+  \*****************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.barredLUnicodeChart = {\n    l: \"ł\",\n    L: \"Ł\"\n};\nexports.barredLUnicode = function (name) { return exports.barredLUnicodeChart[name]; };\n//# sourceMappingURL=barred-letter.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/barred-letter.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/cyrillic.js":
+/*!************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/cyrillic.js ***!
+  \************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.cyrillicUnicodeChart = {\n    \"CYRF\": \"Ф\",\n    \"CYRII\": \"І\",\n    \"CYROMEGA\": \"Ѡ\",\n    \"CYRG\": \"Г\",\n    \"cyrkvcrs\": \"ҝ\",\n    \"cyryo\": \"ё\",\n    \"CYRH\": \"Х\",\n    \"CYRZHDSC\": \"Җ\",\n    \"cyrphk\": \"ҧ\",\n    \"CYRTDSC\": \"Ҭ\",\n    \"CYRI\": \"И\",\n    \"cyryi\": \"ї\",\n    \"CYRDZHE\": \"Џ\",\n    \"cyriote\": \"ѥ\",\n    \"CYRK\": \"К\",\n    \"CYRSHHA\": \"Һ\",\n    \"CYRL\": \"Л\",\n    \"CYRM\": \"М\",\n    \"CYRCHLDSC\": \"Ӌ\",\n    \"CYRNJE\": \"Њ\",\n    \"CYRYAT\": \"Ѣ\",\n    \"CYRA\": \"А\",\n    \"CYRB\": \"Б\",\n    \"cyrchrdsc\": \"ҷ\",\n    \"cyrschwa\": \"ә\",\n    \"CYRDZE\": \"Ѕ\",\n    \"CYRIE\": \"Є\",\n    \"CYRC\": \"Ц\",\n    \"CYRZH\": \"Ж\",\n    \"CYRD\": \"Д\",\n    \"CYRABHCHDSC\": \"Ҿ\",\n    \"CYRFITA\": \"Ѳ\",\n    \"CYRE\": \"Е\",\n    \"CYRABHHA\": \"Ҩ\",\n    \"cyrya\": \"я\",\n    \"cyrdzhe\": \"џ\",\n    \"CYRIOTLYUS\": \"Ѩ\",\n    \"cyrsemisftsn\": \"ҍ\",\n    \"CYRV\": \"В\",\n    \"cyrishrt\": \"й\",\n    \"cyrdje\": \"ђ\",\n    \"cyrchldsc\": \"ӌ\",\n    \"CYRY\": \"Ү\",\n    \"cyrndsc\": \"ң\",\n    \"CYRZ\": \"З\",\n    \"CYRKHCRS\": \"Ҟ\",\n    \"CYRNG\": \"Ҥ\",\n    \"CYRCHRDSC\": \"Ҷ\",\n    \"CYRYHCRS\": \"Ұ\",\n    \"CYRSHCH\": \"Щ\",\n    \"CYRUSHRT\": \"Ў\",\n    \"cyryu\": \"ю\",\n    \"cyrksi\": \"ѯ\",\n    \"CYRN\": \"Н\",\n    \"CYRO\": \"О\",\n    \"CYRBYUS\": \"Ѫ\",\n    \"CYRP\": \"П\",\n    \"CYRZDSC\": \"Ҙ\",\n    \"CYRAE\": \"Ӕ\",\n    \"CYRR\": \"Р\",\n    \"CYRS\": \"С\",\n    \"CYRT\": \"Т\",\n    \"CYRABHCH\": \"Ҽ\",\n    \"cyruk\": \"ѹ\",\n    \"CYRU\": \"У\",\n    \"cyrii\": \"і\",\n    \"CYRSEMISFTSN\": \"Ҍ\",\n    \"cyrghcrs\": \"ғ\",\n    \"CYRISHRT\": \"Й\",\n    \"cyromegatitlo\": \"ѽ\",\n    \"cyrkbeak\": \"ҡ\",\n    \"cyrie\": \"є\",\n    \"cyrzdsc\": \"ҙ\",\n    \"CYRNDSC\": \"Ң\",\n    \"CYRGUP\": \"Ґ\",\n    \"cyrshch\": \"щ\",\n    \"CYRKHK\": \"Ӄ\",\n    \"cyrzh\": \"ж\",\n    \"CYRJE\": \"Ј\",\n    \"cyrthousands\": \"҂\",\n    \"cyrabhch\": \"ҽ\",\n    \"textnumero\": \"№\",\n    \"cyrng\": \"ҥ\",\n    \"CYRPSI\": \"Ѱ\",\n    \"CYRTETSE\": \"Ҵ\",\n    \"CYRIOTBYUS\": \"Ѭ\",\n    \"cyrnje\": \"њ\",\n    \"CYRIOTE\": \"Ѥ\",\n    \"cyrdze\": \"ѕ\",\n    \"cyrae\": \"ӕ\",\n    \"CYRHRDSN\": \"Ъ\",\n    \"CYRKOPPA\": \"Ҁ\",\n    \"CYRRTICK\": \"Ҏ\",\n    \"CYRSCHWA\": \"Ә\",\n    \"cyrtdsc\": \"ҭ\",\n    \"CYRGHK\": \"Ҕ\",\n    \"cyrabhha\": \"ҩ\",\n    \"cyrshha\": \"һ\",\n    \"CYRSH\": \"Ш\",\n    \"cyru\": \"у\",\n    \"cyrkhcrs\": \"ҟ\",\n    \"cyrt\": \"т\",\n    \"CYRERY\": \"Ы\",\n    \"cyrs\": \"с\",\n    \"cyrr\": \"р\",\n    \"CYROT\": \"Ѿ\",\n    \"cyrlyus\": \"ѧ\",\n    \"CYRNHK\": \"Ӈ\",\n    \"CYRSFTSN\": \"Ь\",\n    \"cyrghk\": \"ҕ\",\n    \"cyrp\": \"п\",\n    \"cyrabhdze\": \"ӡ\",\n    \"cyro\": \"о\",\n    \"CYRTSHE\": \"Ћ\",\n    \"cyrn\": \"н\",\n    \"CYRSDSC\": \"Ҫ\",\n    \"cyryhcrs\": \"ұ\",\n    \"cyrpsi\": \"ѱ\",\n    \"cyrz\": \"з\",\n    \"cyry\": \"ү\",\n    \"cyrje\": \"ј\",\n    \"cyrv\": \"в\",\n    \"cyrchvcrs\": \"ҹ\",\n    \"cyrkhk\": \"ӄ\",\n    \"cyre\": \"е\",\n    \"cyromega\": \"ѡ\",\n    \"cyrd\": \"д\",\n    \"cyrc\": \"ц\",\n    \"cyrb\": \"б\",\n    \"CYROTLD\": \"Ө\",\n    \"cyrgup\": \"ґ\",\n    \"CYRLJE\": \"Љ\",\n    \"cyra\": \"а\",\n    \"CYROMEGATITLO\": \"Ѽ\",\n    \"CYRGHCRS\": \"Ғ\",\n    \"CYRCHVCRS\": \"Ҹ\",\n    \"cyrm\": \"м\",\n    \"cyrl\": \"л\",\n    \"cyrsh\": \"ш\",\n    \"cyrk\": \"к\",\n    \"cyri\": \"и\",\n    \"cyrh\": \"х\",\n    \"CYRHDSC\": \"Ҳ\",\n    \"CYRIZH\": \"Ѵ\",\n    \"CYRABHDZE\": \"Ӡ\",\n    \"cyrkdsc\": \"қ\",\n    \"cyrg\": \"г\",\n    \"CYRCH\": \"Ч\",\n    \"cyrf\": \"ф\",\n    \"CYRYI\": \"Ї\",\n    \"cyrmillions\": \"\\u0489\",\n    \"CYRKSI\": \"Ѯ\",\n    \"CYROMEGARND\": \"Ѻ\",\n    \"cyrot\": \"ѿ\",\n    \"cyrtetse\": \"ҵ\",\n    \"cyrhdsc\": \"ҳ\",\n    \"cyrushrt\": \"ў\",\n    \"cyriotlyus\": \"ѩ\",\n    \"CYRYA\": \"Я\",\n    \"cyrlje\": \"љ\",\n    \"cyrotld\": \"ө\",\n    \"CYRKDSC\": \"Қ\",\n    \"cyrhrdsn\": \"ъ\",\n    \"cyrrtick\": \"ҏ\",\n    \"cyrkoppa\": \"ҁ\",\n    \"CYRDJE\": \"Ђ\",\n    \"cyriotbyus\": \"ѭ\",\n    \"cyrhundredthousands\": \"\\u0488\",\n    \"CYRpalochka\": \"Ӏ\",\n    \"CYRKVCRS\": \"Ҝ\",\n    \"cyromegarnd\": \"ѻ\",\n    \"cyrsftsn\": \"ь\",\n    \"cyrabhchdsc\": \"ҿ\",\n    \"cyrzhdsc\": \"җ\",\n    \"cyrerev\": \"э\",\n    \"CYRLYUS\": \"Ѧ\",\n    \"CYRKBEAK\": \"Ҡ\",\n    \"cyrery\": \"ы\",\n    \"CYREREV\": \"Э\",\n    \"cyrnhk\": \"ӈ\",\n    \"cyrsdsc\": \"ҫ\",\n    \"cyrch\": \"ч\",\n    \"cyrtshe\": \"ћ\",\n    \"CYRPHK\": \"Ҧ\",\n    \"CYRYO\": \"Ё\",\n    \"CYRYU\": \"Ю\",\n    \"CYRUK\": \"Ѹ\",\n};\nexports.cyrillicUnicode = function (name) { return exports.cyrillicUnicodeChart[name]; };\n//# sourceMappingURL=cyrillic.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/cyrillic.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/index.js":
+/*!*********************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/index.js ***!
+  \*********************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar space_1 = __webpack_require__(/*! ./space */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/space.js\");\nvar symbols_1 = __webpack_require__(/*! ./symbols */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/symbols.js\");\nvar barred_letter_1 = __webpack_require__(/*! ./barred-letter */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/barred-letter.js\");\nvar slashed_1 = __webpack_require__(/*! ./slashed */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/slashed.js\");\nvar cyrillic_1 = __webpack_require__(/*! ./cyrillic */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/cyrillic.js\");\nvar specialchars_1 = __webpack_require__(/*! ./specialchars */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/specialchars.js\");\nexports.expand0argsCommand = function (name) {\n    for (var _i = 0, _a = [\n        barred_letter_1.barredLUnicode,\n        space_1.spaceUnicode,\n        slashed_1.slashedOUnicode,\n        symbols_1.characterUnicode,\n        specialchars_1.specialCharacter,\n        cyrillic_1.cyrillicUnicode\n    ]; _i < _a.length; _i++) {\n        var fn = _a[_i];\n        var result = fn(name);\n        if (!!result)\n            return result;\n    }\n};\n//# sourceMappingURL=index.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/index.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/slashed.js":
+/*!***********************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/slashed.js ***!
+  \***********************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.slashed_o = \"ø\";\nexports.slashed_O = \"Ø\";\nexports.slashedOUnicodeChart = {\n    \"o\": exports.slashed_o,\n    \"O\": exports.slashed_O\n};\nexports.slashedOUnicode = function (char) { return exports.slashedOUnicodeChart[char]; };\n//# sourceMappingURL=slashed.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/slashed.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/space.js":
+/*!*********************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/space.js ***!
+  \*********************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.mathSpace = \"\\u8287\";\nexports.spaceCharactersUnicode = {\n    \",\": \"\\u2009\",\n    \"quad\": \"\\u2003\",\n    \"qquad\": \"\\u2003\\u2003\",\n    \" \": \" \",\n    \"space\": \" \",\n    \";\": \"　\",\n    \":\": \"　\",\n    \"hfill\": \"\\t\"\n};\nfunction isSpaceCharactersUnicode(x) {\n    return exports.spaceCharactersUnicode.hasOwnProperty(x);\n}\nexports.isSpaceCharactersUnicode = isSpaceCharactersUnicode;\nexports.spaceUnicode = function (name) { return isSpaceCharactersUnicode(name) ? exports.spaceCharactersUnicode[name] : undefined; };\n//# sourceMappingURL=space.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/space.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/specialchars.js":
+/*!****************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/specialchars.js ***!
+  \****************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.specialCharacters = {\n    \"i\": \"ı\",\n    \"j\": \"ȷ\",\n    \"oe\": \"œ\",\n    \"OE\": \"Œ\",\n    \"ae\": \"æ\",\n    \"AE\": \"Æ\",\n    \"aa\": \"å\",\n    \"AA\": \"Å\",\n    \"o\": \"ø\",\n    \"O\": \"Ø\",\n    \"ss\": \"ß\",\n    \"l\": \"ł\",\n    \"L\": \"Ł\"\n};\nfunction isSpecialCharacter(x) {\n    return exports.specialCharacters.hasOwnProperty(x);\n}\nexports.isSpecialCharacter = isSpecialCharacter;\nexports.specialCharacter = function (name) { return isSpecialCharacter(name) ? exports.specialCharacters[name] : undefined; };\n//# sourceMappingURL=specialchars.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/specialchars.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/symbols.js":
+/*!***********************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/symbols.js ***!
+  \***********************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.characterUnicodeChart = {\n    \"leftrightsquigarrow\": \"↭\",\n    \"Longleftrightarrow\": \"⟺\",\n    \"blacktriangleright\": \"▶\",\n    \"longleftrightarrow\": \"⟷\",\n    \"blacktriangledown\": \"▼\",\n    \"blacktriangleleft\": \"◀\",\n    \"leftrightharpoons\": \"⇋\",\n    \"rightleftharpoons\": \"⇌\",\n    \"twoheadrightarrow\": \"↠\",\n    \"circlearrowright\": \"↻\",\n    \"downharpoonright\": \"⇂\",\n    \"rightharpoondown\": \"⇁\",\n    \"rightrightarrows\": \"⇉\",\n    \"twoheadleftarrow\": \"↞\",\n    \"vartriangleright\": \"⊳\",\n    \"bigtriangledown\": \"▽\",\n    \"circlearrowleft\": \"↺\",\n    \"curvearrowright\": \"↷\",\n    \"downharpoonleft\": \"⇃\",\n    \"leftharpoondown\": \"↽\",\n    \"leftrightarrows\": \"⇆\",\n    \"rightleftarrows\": \"⇄\",\n    \"rightsquigarrow\": \"⇝\",\n    \"rightthreetimes\": \"⋌\",\n    \"trianglerighteq\": \"⊵\",\n    \"vartriangleleft\": \"⊲\",\n    \"Leftrightarrow\": \"⇔\",\n    \"Longrightarrow\": \"⟹\",\n    \"curvearrowleft\": \"↶\",\n    \"dashrightarrow\": \"⇢\",\n    \"doublebarwedge\": \"⩞\",\n    \"downdownarrows\": \"⇊\",\n    \"hookrightarrow\": \"↪\",\n    \"leftleftarrows\": \"⇇\",\n    \"leftrightarrow\": \"↔\",\n    \"leftthreetimes\": \"⋋\",\n    \"longrightarrow\": \"⟶\",\n    \"looparrowright\": \"↬\",\n    \"rightarrowtail\": \"↣\",\n    \"rightharpoonup\": \"⇀\",\n    \"sphericalangle\": \"∢\",\n    \"textregistered\": \"®\",\n    \"trianglelefteq\": \"⊴\",\n    \"upharpoonright\": \"↾\",\n    \"Longleftarrow\": \"⟸\",\n    \"bigtriangleup\": \"△\",\n    \"blacktriangle\": \"▲\",\n    \"dashleftarrow\": \"⇠\",\n    \"divideontimes\": \"⋇\",\n    \"fallingdotseq\": \"≒\",\n    \"hookleftarrow\": \"↩\",\n    \"leftarrowtail\": \"↢\",\n    \"leftharpoonup\": \"↼\",\n    \"longleftarrow\": \"⟵\",\n    \"looparrowleft\": \"↫\",\n    \"measuredangle\": \"∡\",\n    \"shortparallel\": \"∥\",\n    \"smallsetminus\": \"∖\",\n    \"texttrademark\": \"™\",\n    \"triangleright\": \"▷\",\n    \"upharpoonleft\": \"↿\",\n    \"blacklozenge\": \"◆\",\n    \"risingdotseq\": \"≓\",\n    \"triangledown\": \"▽\",\n    \"triangleleft\": \"◁\",\n    \"Rrightarrow\": \"⇛\",\n    \"Updownarrow\": \"⇕\",\n    \"backepsilon\": \"∍\",\n    \"blacksquare\": \"■\",\n    \"circledcirc\": \"⊚\",\n    \"circleddash\": \"⊝\",\n    \"curlyeqprec\": \"⋞\",\n    \"curlyeqsucc\": \"⋟\",\n    \"diamondsuit\": \"♢\",\n    \"preccurlyeq\": \"≼\",\n    \"succcurlyeq\": \"≽\",\n    \"textgreater\": \">\",\n    \"thickapprox\": \"≈\",\n    \"updownarrow\": \"↕\",\n    \"vartriangle\": \"△\",\n    \"Lleftarrow\": \"⇚\",\n    \"Rightarrow\": \"⇒\",\n    \"circledast\": \"⊛\",\n    \"complement\": \"∁\",\n    \"curlywedge\": \"⋏\",\n    \"longmapsto\": \"⟼\",\n    \"registered\": \"®\",\n    \"rightarrow\": \"→\",\n    \"smallfrown\": \"⌢\",\n    \"smallsmile\": \"⌣\",\n    \"sqsubseteq\": \"⊑\",\n    \"sqsupseteq\": \"⊒\",\n    \"textlangle\": \"〈\",\n    \"textrangle\": \"〉\",\n    \"upuparrows\": \"⇈\",\n    \"varepsilon\": \"ε\",\n    \"varnothing\": \"∅\",\n    \"Downarrow\": \"⇓\",\n    \"Leftarrow\": \"⇐\",\n    \"backprime\": \"‵\",\n    \"bigotimes\": \"⨂\",\n    \"centerdot\": \"⋅\",\n    \"copyright\": \"©\",\n    \"downarrow\": \"↓\",\n    \"gtreqless\": \"⋛\",\n    \"heartsuit\": \"♡\",\n    \"leftarrow\": \"←\",\n    \"lesseqgtr\": \"⋚\",\n    \"pitchfork\": \"⋔\",\n    \"spadesuit\": \"♠\",\n    \"therefore\": \"∴\",\n    \"trademark\": \"™\",\n    \"triangleq\": \"≜\",\n    \"varpropto\": \"∝\",\n    \"approxeq\": \"≊\",\n    \"barwedge\": \"⊼\",\n    \"bigoplus\": \"⨁\",\n    \"bigsqcup\": \"⨆\",\n    \"biguplus\": \"⨄\",\n    \"bigwedge\": \"⋀\",\n    \"boxminus\": \"⊟\",\n    \"boxtimes\": \"⊠\",\n    \"circledS\": \"Ⓢ\",\n    \"clubsuit\": \"♣\",\n    \"curlyvee\": \"⋎\",\n    \"doteqdot\": \"≑\",\n    \"emptyset\": \"∅\",\n    \"intercal\": \"⊺\",\n    \"leqslant\": \"⩽\",\n    \"multimap\": \"⊸\",\n    \"parallel\": \"∥\",\n    \"setminus\": \"∖\",\n    \"sqsubset\": \"⊏\",\n    \"sqsupset\": \"⊐\",\n    \"subseteq\": \"⊆\",\n    \"supseteq\": \"⊇\",\n    \"textless\": \"<\",\n    \"thicksim\": \"∼\",\n    \"triangle\": \"△\",\n    \"varkappa\": \"ϰ\",\n    \"varsigma\": \"ς\",\n    \"vartheta\": \"ϑ\",\n    \"Diamond\": \"◇\",\n    \"Uparrow\": \"⇑\",\n    \"Upsilon\": \"Υ\",\n    \"backsim\": \"∽\",\n    \"because\": \"∵\",\n    \"between\": \"≬\",\n    \"bigodot\": \"⨀\",\n    \"bigstar\": \"★\",\n    \"boxplus\": \"⊞\",\n    \"ddagger\": \"‡\",\n    \"diamond\": \"⋄\",\n    \"digamma\": \"Ϝ\",\n    \"dotplus\": \"∔\",\n    \"epsilon\": \"∊\",\n    \"gtrless\": \"≷\",\n    \"implies\": \"⇒\",\n    \"leadsto\": \"↝\",\n    \"lessdot\": \"⋖\",\n    \"lessgtr\": \"≶\",\n    \"lesssim\": \"≲\",\n    \"lozenge\": \"◊\",\n    \"natural\": \"♮\",\n    \"nearrow\": \"↗\",\n    \"nexists\": \"∄\",\n    \"nwarrow\": \"↖\",\n    \"partial\": \"∂\",\n    \"pilcrow\": \"¶\",\n    \"precsim\": \"≾\",\n    \"searrow\": \"↘\",\n    \"section\": \"§\",\n    \"succsim\": \"≿\",\n    \"swarrow\": \"↙\",\n    \"textbar\": \"|\",\n    \"uparrow\": \"↑\",\n    \"upsilon\": \"υ\",\n    \"Bumpeq\": \"≎\",\n    \"Lambda\": \"Λ\",\n    \"Subset\": \"⋐\",\n    \"Supset\": \"⋑\",\n    \"Vvdash\": \"⊪\",\n    \"approx\": \"≈\",\n    \"bigcap\": \"⋂\",\n    \"bigcup\": \"⋃\",\n    \"bigvee\": \"⋁\",\n    \"bowtie\": \"⋈\",\n    \"boxdot\": \"⊡\",\n    \"bullet\": \"∙\",\n    \"bumpeq\": \"≏\",\n    \"circeq\": \"≗\",\n    \"coprod\": \"∐\",\n    \"dagger\": \"†\",\n    \"daleth\": \"ד\",\n    \"degree\": \"°\",\n    \"eqcirc\": \"≖\",\n    \"exists\": \"∃\",\n    \"forall\": \"∀\",\n    \"gtrdot\": \"⋗\",\n    \"gtrsim\": \"≳\",\n    \"hslash\": \"ℏ\",\n    \"lambda\": \"λ\",\n    \"lfloor\": \"⌊\",\n    \"ltimes\": \"⋉\",\n    \"mapsto\": \"↦\",\n    \"models\": \"⊨\",\n    \"ominus\": \"⊖\",\n    \"oslash\": \"⊘\",\n    \"otimes\": \"⊗\",\n    \"preceq\": \"⪯\",\n    \"propto\": \"∝\",\n    \"rfloor\": \"⌋\",\n    \"rtimes\": \"⋊\",\n    \"square\": \"□\",\n    \"subset\": \"⊂\",\n    \"succeq\": \"⪰\",\n    \"supset\": \"⊃\",\n    \"varphi\": \"φ\",\n    \"varrho\": \"ϱ\",\n    \"veebar\": \"⊻\",\n    \"Delta\": \"Δ\",\n    \"Gamma\": \"Γ\",\n    \"Omega\": \"Ω\",\n    \"Theta\": \"Θ\",\n    \"Vdash\": \"⊩\",\n    \"aleph\": \"ℵ\",\n    \"Alpha\": \"Α\",\n    \"alpha\": \"α\",\n    \"angle\": \"∠\",\n    \"asymp\": \"≍\",\n    \"cdots\": \"⋯\",\n    \"cents\": \"¢\",\n    \"dashv\": \"⊣\",\n    \"ddots\": \"⋱\",\n    \"delta\": \"δ\",\n    \"doteq\": \"≐\",\n    \"equiv\": \"≡\",\n    \"frown\": \"⌢\",\n    \"gamma\": \"γ\",\n    \"gimel\": \"ℷ\",\n    \"infty\": \"∞\",\n    \"kappa\": \"κ\",\n    \"Kappa\": \"Κ\",\n    \"lceil\": \"⌈\",\n    \"nabla\": \"∇\",\n    \"notin\": \"∉\",\n    \"omega\": \"ω\",\n    \"oplus\": \"⊕\",\n    \"pound\": \"£\",\n    \"prime\": \"′\",\n    \"qquad\": \"  \",\n    \"rceil\": \"⌉\",\n    \"sharp\": \"♯\",\n    \"sigma\": \"σ\",\n    \"simeq\": \"≃\",\n    \"smile\": \"⌣\",\n    \"space\": \"␣\",\n    \"sqcap\": \"⊓\",\n    \"sqcup\": \"⊔\",\n    \"theta\": \"θ\",\n    \"times\": \"×\",\n    \"unlhd\": \"⊴\",\n    \"unrhd\": \"⊵\",\n    \"uplus\": \"⊎\",\n    \"vDash\": \"⊨\",\n    \"varpi\": \"ϖ\",\n    \"vdash\": \"⊢\",\n    \"vdots\": \"⋮\",\n    \"wedge\": \"∧\",\n    \"Finv\": \"Ⅎ\",\n    \"Join\": \"⋈\",\n    \"atop\": \"¦\",\n    \"beta\": \"β\",\n    \"Beta\": \"Β\",\n    \"beth\": \"ב\",\n    \"cdot\": \"⋅\",\n    \"circ\": \"∘\",\n    \"cong\": \"≅\",\n    \"dots\": \"…\",\n    \"euro\": \"€\",\n    \"flat\": \"♭\",\n    \"geqq\": \"≧\",\n    \"hbar\": \"ℏ\",\n    \"iota\": \"ι\",\n    \"leqq\": \"≦\",\n    \"odot\": \"⊙\",\n    \"oint\": \"∮\",\n    \"perp\": \"⊥\",\n    \"prec\": \"≺\",\n    \"prod\": \"∏\",\n    \"quad\": \" \",\n    \"star\": \"⋆\",\n    \"succ\": \"≻\",\n    \"surd\": \"√\",\n    \"zeta\": \"ζ\",\n    \"Box\": \"□\",\n    \"Cap\": \"⋒\",\n    \"Cup\": \"⋓\",\n    \"Lsh\": \"↰\",\n    \"Phi\": \"Φ\",\n    \"Psi\": \"Ψ\",\n    \"Rsh\": \"↱\",\n    \"ast\": \"∗\",\n    \"bot\": \"⊥\",\n    \"cap\": \"∩\",\n    \"chi\": \"χ\",\n    \"Chi\": \"Χ\",\n    \"cup\": \"∪\",\n    \"div\": \"÷\",\n    \"ell\": \"ℓ\",\n    \"eta\": \"η\",\n    \"eth\": \"ð\",\n    \"geq\": \"≥\",\n    \"ggg\": \"⋙\",\n    \"int\": \"∫\",\n    \"leq\": \"≤\",\n    \"lhd\": \"⊲\",\n    \"lll\": \"⋘\",\n    \"mho\": \"℧\",\n    \"mid\": \"∣\",\n    \"neg\": \"¬\",\n    \"neq\": \"≠\",\n    \"phi\": \"ϕ\",\n    \"psi\": \"ψ\",\n    \"rhd\": \"⊳\",\n    \"rho\": \"ρ\",\n    \"Rho\": \"Ρ\",\n    \"sim\": \"∼\",\n    \"sum\": \"∑\",\n    \"tau\": \"τ\",\n    \"Tau\": \"Τ\",\n    \"top\": \"⊤\",\n    \"vee\": \"∨\",\n    \"Im\": \"ℑ\",\n    \"Pi\": \"Π\",\n    \"Re\": \"ℜ\",\n    \"Xi\": \"Ξ\",\n    \"ge\": \"≥\",\n    \"gg\": \"≫\",\n    \"in\": \"∈\",\n    \"le\": \"≤\",\n    \"ll\": \"≪\",\n    \"mp\": \"∓\",\n    \"mu\": \"μ\",\n    \"Mu\": \"Μ\",\n    \"ni\": \"∋\",\n    \"nu\": \"ν\",\n    \"Nu\": \"Ν\",\n    \"pi\": \"π\",\n    \"pm\": \"±\",\n    \"wp\": \"℘\",\n    \"wr\": \"≀\",\n    \"xi\": \"ξ\",\n    \"Omicron\": \"Ο\",\n    \"omicron\": \"ο\",\n    \"textdollar\": \"$\",\n    \"textquotesingle\": \"'\",\n    \"textbackslash\": \"\\\\\",\n    \"textasciigrave\": \"`\",\n    \"lbrace\": \"{\",\n    \"vert\": \"|\",\n    \"rbrace\": \"}\",\n    \"textasciitilde\": \"~\",\n    \"textexclamdown\": \"¡\",\n    \"textcent\": \"¢\",\n    \"textsterling\": \"£\",\n    \"textcurrency\": \"¤\",\n    \"textyen\": \"¥\",\n    \"textbrokenbar\": \"¦\",\n    \"textsection\": \"§\",\n    \"textasciidieresis\": \"¨\",\n    \"textcopyright\": \"©\",\n    \"textordfeminine\": \"ª\",\n    \"guillemotleft\": \"«\",\n    \"lnot\": \"¬\",\n    \"textasciimacron\": \"¯\",\n    \"textdegree\": \"°\",\n    \"textasciiacute\": \"´\",\n    \"textparagraph\": \"¶\",\n    \"textordmasculine\": \"º\",\n    \"guillemotright\": \"»\",\n    \"textonequarter\": \"¼\",\n    \"textonehalf\": \"½\",\n    \"textthreequarters\": \"¾\",\n    \"textquestiondown\": \"¿\",\n    \"AA\": \"Å\",\n    \"AE\": \"Æ\",\n    \"DH\": \"Ð\",\n    \"texttimes\": \"×\",\n    \"TH\": \"Þ\",\n    \"ss\": \"ß\",\n    \"aa\": \"å\",\n    \"ae\": \"æ\",\n    \"dh\": \"ð\",\n    \"th\": \"þ\",\n    \"DJ\": \"Đ\",\n    \"dj\": \"đ\",\n    \"Elzxh\": \"ħ\",\n    \"i\": \"ı\",\n    \"NG\": \"Ŋ\",\n    \"ng\": \"ŋ\",\n    \"OE\": \"Œ\",\n    \"oe\": \"œ\",\n    \"texthvlig\": \"ƕ\",\n    \"textnrleg\": \"ƞ\",\n    \"textdoublepipe\": \"ǂ\",\n    \"Elztrna\": \"ɐ\",\n    \"Elztrnsa\": \"ɒ\",\n    \"Elzopeno\": \"ɔ\",\n    \"Elzrtld\": \"ɖ\",\n    \"Elzschwa\": \"ə\",\n    \"Elzpgamma\": \"ɣ\",\n    \"Elzpbgam\": \"ɤ\",\n    \"Elztrnh\": \"ɥ\",\n    \"Elzbtdl\": \"ɬ\",\n    \"Elzrtll\": \"ɭ\",\n    \"Elztrnm\": \"ɯ\",\n    \"Elztrnmlr\": \"ɰ\",\n    \"Elzltlmr\": \"ɱ\",\n    \"Elzltln\": \"ɲ\",\n    \"Elzrtln\": \"ɳ\",\n    \"Elzclomeg\": \"ɷ\",\n    \"textphi\": \"ɸ\",\n    \"Elztrnr\": \"ɹ\",\n    \"Elztrnrl\": \"ɺ\",\n    \"Elzrttrnr\": \"ɻ\",\n    \"Elzrl\": \"ɼ\",\n    \"Elzrtlr\": \"ɽ\",\n    \"Elzfhr\": \"ɾ\",\n    \"Elzrtls\": \"ʂ\",\n    \"Elzesh\": \"ʃ\",\n    \"Elztrnt\": \"ʇ\",\n    \"Elzrtlt\": \"ʈ\",\n    \"Elzpupsil\": \"ʊ\",\n    \"Elzpscrv\": \"ʋ\",\n    \"Elzinvv\": \"ʌ\",\n    \"Elzinvw\": \"ʍ\",\n    \"Elztrny\": \"ʎ\",\n    \"Elzrtlz\": \"ʐ\",\n    \"Elzyogh\": \"ʒ\",\n    \"Elzglst\": \"ʔ\",\n    \"Elzreglst\": \"ʕ\",\n    \"Elzinglst\": \"ʖ\",\n    \"textturnk\": \"ʞ\",\n    \"Elzdyogh\": \"ʤ\",\n    \"Elztesh\": \"ʧ\",\n    \"textasciicaron\": \"ˇ\",\n    \"Elzverts\": \"ˈ\",\n    \"Elzverti\": \"ˌ\",\n    \"Elzlmrk\": \"ː\",\n    \"Elzhlmrk\": \"ˑ\",\n    \"Elzsbrhr\": \"˒\",\n    \"Elzsblhr\": \"˓\",\n    \"Elzrais\": \"˔\",\n    \"Elzlow\": \"˕\",\n    \"textasciibreve\": \"˘\",\n    \"textperiodcentered\": \"˙\",\n    \"texttildelow\": \"˜\",\n    \"Epsilon\": \"Ε\",\n    \"Zeta\": \"Ζ\",\n    \"Eta\": \"Η\",\n    \"Iota\": \"Ι\",\n    \"Sigma\": \"Σ\",\n    \"texttheta\": \"θ\",\n    \"textvartheta\": \"ϑ\",\n    \"Stigma\": \"Ϛ\",\n    \"Digamma\": \"Ϝ\",\n    \"Koppa\": \"Ϟ\",\n    \"Sampi\": \"Ϡ\",\n    \"textTheta\": \"ϴ\",\n    \"textendash\": \"–\",\n    \"textemdash\": \"—\",\n    \"Vert\": \"‖\",\n    \"Elzreapos\": \"‛\",\n    \"textquotedblleft\": \"“\",\n    \"textquotedblright\": \"”\",\n    \"textdagger\": \"†\",\n    \"textdaggerdbl\": \"‡\",\n    \"textbullet\": \"•\",\n    \"ldots\": \"…\",\n    \"textperthousand\": \"‰\",\n    \"textpertenthousand\": \"‱\",\n    \"guilsinglleft\": \"‹\",\n    \"guilsinglright\": \"›\",\n    \"nolinebreak\": \"⁠\",\n    \"Elzxrat\": \"℞\",\n    \"nleftarrow\": \"↚\",\n    \"nrightarrow\": \"↛\",\n    \"arrowwaveleft\": \"↜\",\n    \"arrowwaveright\": \"↝\",\n    \"nleftrightarrow\": \"↮\",\n    \"dblarrowupdown\": \"⇅\",\n    \"nLeftarrow\": \"⇍\",\n    \"nLeftrightarrow\": \"⇎\",\n    \"nRightarrow\": \"⇏\",\n    \"DownArrowUpArrow\": \"⇵\",\n    \"rightangle\": \"∟\",\n    \"nmid\": \"∤\",\n    \"nparallel\": \"∦\",\n    \"surfintegral\": \"∯\",\n    \"volintegral\": \"∰\",\n    \"clwintegral\": \"∱\",\n    \"Colon\": \"∷\",\n    \"homothetic\": \"∻\",\n    \"lazysinv\": \"∾\",\n    \"NotEqualTilde\": \"≂\",\n    \"approxnotequal\": \"≆\",\n    \"tildetrpl\": \"≋\",\n    \"allequal\": \"≌\",\n    \"NotHumpDownHump\": \"≎\",\n    \"NotHumpEqual\": \"≏\",\n    \"estimates\": \"≙\",\n    \"starequal\": \"≛\",\n    \"lneqq\": \"≨\",\n    \"lvertneqq\": \"≨\",\n    \"gneqq\": \"≩\",\n    \"gvertneqq\": \"≩\",\n    \"NotLessLess\": \"≪\",\n    \"NotGreaterGreater\": \"≫\",\n    \"lessequivlnt\": \"≲\",\n    \"greaterequivlnt\": \"≳\",\n    \"notlessgreater\": \"≸\",\n    \"notgreaterless\": \"≹\",\n    \"precapprox\": \"≾\",\n    \"NotPrecedesTilde\": \"≾\",\n    \"succapprox\": \"≿\",\n    \"NotSucceedsTilde\": \"≿\",\n    \"subsetneq\": \"⊊\",\n    \"varsubsetneqq\": \"⊊\",\n    \"supsetneq\": \"⊋\",\n    \"varsupsetneq\": \"⊋\",\n    \"NotSquareSubset\": \"⊏\",\n    \"NotSquareSuperset\": \"⊐\",\n    \"truestate\": \"⊧\",\n    \"forcesextra\": \"⊨\",\n    \"VDash\": \"⊫\",\n    \"nvdash\": \"⊬\",\n    \"nvDash\": \"⊭\",\n    \"nVdash\": \"⊮\",\n    \"nVDash\": \"⊯\",\n    \"original\": \"⊶\",\n    \"image\": \"⊷\",\n    \"hermitconjmatrix\": \"⊹\",\n    \"rightanglearc\": \"⊾\",\n    \"backsimeq\": \"⋍\",\n    \"verymuchless\": \"⋘\",\n    \"verymuchgreater\": \"⋙\",\n    \"Elzsqspne\": \"⋥\",\n    \"lnsim\": \"⋦\",\n    \"gnsim\": \"⋧\",\n    \"precedesnotsimilar\": \"⋨\",\n    \"succnsim\": \"⋩\",\n    \"ntriangleleft\": \"⋪\",\n    \"ntriangleright\": \"⋫\",\n    \"ntrianglelefteq\": \"⋬\",\n    \"ntrianglerighteq\": \"⋭\",\n    \"upslopeellipsis\": \"⋰\",\n    \"downslopeellipsis\": \"⋱\",\n    \"perspcorrespond\": \"⌆\",\n    \"recorder\": \"⌕\",\n    \"ulcorner\": \"⌜\",\n    \"urcorner\": \"⌝\",\n    \"llcorner\": \"⌞\",\n    \"lrcorner\": \"⌟\",\n    \"langle\": \"〈\",\n    \"rangle\": \"〉\",\n    \"Elzdlcorn\": \"⎣\",\n    \"lmoustache\": \"⎰\",\n    \"rmoustache\": \"⎱\",\n    \"textvisiblespace\": \"␣\",\n    \"Elzdshfnc\": \"┆\",\n    \"Elzsqfnw\": \"┙\",\n    \"diagup\": \"╱\",\n    \"Elzvrecto\": \"▯\",\n    \"Elzcirfl\": \"◐\",\n    \"Elzcirfr\": \"◑\",\n    \"Elzcirfb\": \"◒\",\n    \"Elzrvbull\": \"◘\",\n    \"Elzsqfl\": \"◧\",\n    \"Elzsqfr\": \"◨\",\n    \"Elzsqfse\": \"◪\",\n    \"bigcirc\": \"◯\",\n    \"rightmoon\": \"☾\",\n    \"mercury\": \"☿\",\n    \"venus\": \"♀\",\n    \"male\": \"♂\",\n    \"jupiter\": \"♃\",\n    \"saturn\": \"♄\",\n    \"uranus\": \"♅\",\n    \"neptune\": \"♆\",\n    \"pluto\": \"♇\",\n    \"aries\": \"♈\",\n    \"taurus\": \"♉\",\n    \"gemini\": \"♊\",\n    \"cancer\": \"♋\",\n    \"leo\": \"♌\",\n    \"virgo\": \"♍\",\n    \"libra\": \"♎\",\n    \"scorpio\": \"♏\",\n    \"sagittarius\": \"♐\",\n    \"capricornus\": \"♑\",\n    \"aquarius\": \"♒\",\n    \"pisces\": \"♓\",\n    \"quarternote\": \"♩\",\n    \"eighthnote\": \"♪\",\n    \"UpArrowBar\": \"⤒\",\n    \"DownArrowBar\": \"⤓\",\n    \"Elolarr\": \"⥀\",\n    \"Elorarr\": \"⥁\",\n    \"ElzRlarr\": \"⥂\",\n    \"ElzrLarr\": \"⥄\",\n    \"Elzrarrx\": \"⥇\",\n    \"LeftRightVector\": \"⥎\",\n    \"RightUpDownVector\": \"⥏\",\n    \"DownLeftRightVector\": \"⥐\",\n    \"LeftUpDownVector\": \"⥑\",\n    \"LeftVectorBar\": \"⥒\",\n    \"RightVectorBar\": \"⥓\",\n    \"RightUpVectorBar\": \"⥔\",\n    \"RightDownVectorBar\": \"⥕\",\n    \"DownLeftVectorBar\": \"⥖\",\n    \"DownRightVectorBar\": \"⥗\",\n    \"LeftUpVectorBar\": \"⥘\",\n    \"LeftDownVectorBar\": \"⥙\",\n    \"LeftTeeVector\": \"⥚\",\n    \"RightTeeVector\": \"⥛\",\n    \"RightUpTeeVector\": \"⥜\",\n    \"RightDownTeeVector\": \"⥝\",\n    \"DownLeftTeeVector\": \"⥞\",\n    \"DownRightTeeVector\": \"⥟\",\n    \"LeftUpTeeVector\": \"⥠\",\n    \"LeftDownTeeVector\": \"⥡\",\n    \"UpEquilibrium\": \"⥮\",\n    \"ReverseUpEquilibrium\": \"⥯\",\n    \"RoundImplies\": \"⥰\",\n    \"Elztfnc\": \"⦀\",\n    \"Elroang\": \"⦆\",\n    \"Elzddfnc\": \"⦙\",\n    \"Angle\": \"⦜\",\n    \"Elzlpargt\": \"⦠\",\n    \"ElzLap\": \"⧊\",\n    \"Elzdefas\": \"⧋\",\n    \"LeftTriangleBar\": \"⧏\",\n    \"NotLeftTriangleBar\": \"⧏\",\n    \"RightTriangleBar\": \"⧐\",\n    \"NotRightTriangleBar\": \"⧐\",\n    \"RuleDelayed\": \"⧴\",\n    \"Elxuplus\": \"⨄\",\n    \"ElzThr\": \"⨅\",\n    \"Elxsqcup\": \"⨆\",\n    \"ElzInf\": \"⨇\",\n    \"ElzSup\": \"⨈\",\n    \"ElzCint\": \"⨍\",\n    \"clockoint\": \"⨏\",\n    \"sqrint\": \"⨖\",\n    \"ElzTimes\": \"⨯\",\n    \"amalg\": \"⨿\",\n    \"ElzAnd\": \"⩓\",\n    \"ElzOr\": \"⩔\",\n    \"ElOr\": \"⩖\",\n    \"Elzminhat\": \"⩟\",\n    \"Equal\": \"⩵\",\n    \"nleqslant\": \"⩽\",\n    \"geqslant\": \"⩾\",\n    \"ngeqslant\": \"⩾\",\n    \"lessapprox\": \"⪅\",\n    \"gtrapprox\": \"⪆\",\n    \"lneq\": \"⪇\",\n    \"gneq\": \"⪈\",\n    \"lnapprox\": \"⪉\",\n    \"gnapprox\": \"⪊\",\n    \"lesseqqgtr\": \"⪋\",\n    \"gtreqqless\": \"⪌\",\n    \"eqslantless\": \"⪕\",\n    \"eqslantgtr\": \"⪖\",\n    \"NestedLessLess\": \"⪡\",\n    \"NotNestedLessLess\": \"⪡\",\n    \"NestedGreaterGreater\": \"⪢\",\n    \"NotNestedGreaterGreater\": \"⪢\",\n    \"precneqq\": \"⪵\",\n    \"succneqq\": \"⪶\",\n    \"precnapprox\": \"⪹\",\n    \"succnapprox\": \"⪺\",\n    \"subseteqq\": \"⫅\",\n    \"nsubseteqq\": \"⫅\",\n    \"supseteqq\": \"⫆\",\n    \"subsetneqq\": \"⫋\",\n    \"supsetneqq\": \"⫌\",\n    \"Elztdcol\": \"⫶\",\n    \"openbracketleft\": \"〚\",\n    \"openbracketright\": \"〛\",\n    checkmark: \"✓\",\n    maltese: \"✠\",\n};\nfunction isCharacterUnicode(x) {\n    return exports.characterUnicodeChart.hasOwnProperty(x);\n}\nexports.isCharacterUnicode = isCharacterUnicode;\nexports.characterUnicode = function (name) { return isCharacterUnicode(name) ? exports.characterUnicodeChart[name] : undefined; };\n//# sourceMappingURL=symbols.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/symbols.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/acute.js":
+/*!********************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/acute.js ***!
+  \********************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar command_expander_1 = __webpack_require__(/*! ../../command-expander */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/command-expander.js\");\nexports.acuteAccent = command_expander_1.lookupOrAppend({\n    e: \"é\",\n    y: \"ý\",\n    u: \"ú\",\n    i: \"í\",\n    o: \"ó\",\n    a: \"á\",\n    E: \"É\",\n    Y: \"Ý\",\n    U: \"Ú\",\n    I: \"Í\",\n    O: \"Ó\",\n    A: \"Á\",\n    cyrk: \"ќ\",\n    cyrg: \"ѓ\",\n    CYRK: \"Ќ\",\n    CYRG: \"Ѓ\",\n}, \"\\u0301\");\n//# sourceMappingURL=acute.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/acute.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/caron.js":
+/*!********************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/caron.js ***!
+  \********************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar command_expander_1 = __webpack_require__(/*! ../../command-expander */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/command-expander.js\");\nexports.caron = command_expander_1.lookupOrAppend({\n    s: \"š\"\n}, \"\\u030C\");\n//# sourceMappingURL=caron.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/caron.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/cedilla.js":
+/*!**********************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/cedilla.js ***!
+  \**********************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar command_expander_1 = __webpack_require__(/*! ../../command-expander */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/command-expander.js\");\nexports.cedilla = command_expander_1.lookupOrAppend({\n    c: \"ç\"\n}, \"\\u0327\");\n//# sourceMappingURL=cedilla.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/cedilla.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/circumflex.js":
+/*!*************************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/circumflex.js ***!
+  \*************************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar command_expander_1 = __webpack_require__(/*! ../../command-expander */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/command-expander.js\");\nexports.circumflex = command_expander_1.lookupOrAppend({\n    e: \"ê\",\n    u: \"û\",\n    i: \"î\",\n    o: \"ô\",\n    a: \"â\",\n    E: \"Ê\",\n    U: \"Û\",\n    I: \"Î\",\n    O: \"Ô\",\n    A: \"Â\"\n}, \"\\u0302\");\n//# sourceMappingURL=circumflex.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/circumflex.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/dieresis.js":
+/*!***********************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/dieresis.js ***!
+  \***********************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar command_expander_1 = __webpack_require__(/*! ../../command-expander */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/command-expander.js\");\nexports.dieresis = command_expander_1.lookupOrAppend({\n    e: \"ë\",\n    y: \"ÿ\",\n    u: \"ü\",\n    i: \"ï\",\n    o: \"ö\",\n    a: \"ä\",\n    E: \"Ë\",\n    Y: \"Ÿ\",\n    U: \"Ü\",\n    I: \"Ï\",\n    O: \"Ö\",\n    A: \"Ä\"\n}, \"\\u0308\");\n//# sourceMappingURL=dieresis.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/dieresis.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/grave.js":
+/*!********************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/grave.js ***!
+  \********************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar command_expander_1 = __webpack_require__(/*! ../../command-expander */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/command-expander.js\");\nexports.graveAccent = command_expander_1.lookupOrAppend({\n    e: \"è\",\n    u: \"ù\",\n    i: \"ì\",\n    o: \"ò\",\n    a: \"à\",\n    E: \"È\",\n    U: \"Ù\",\n    I: \"Ì\",\n    O: \"Ò\",\n    A: \"À\"\n}, \"\\u0300\");\n//# sourceMappingURL=grave.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/grave.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/index.js":
+/*!********************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/index.js ***!
+  \********************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar mathring_1 = __webpack_require__(/*! ./mathring */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/mathring.js\");\nvar acute_1 = __webpack_require__(/*! ./acute */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/acute.js\");\nvar grave_1 = __webpack_require__(/*! ./grave */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/grave.js\");\nvar circumflex_1 = __webpack_require__(/*! ./circumflex */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/circumflex.js\");\nvar tilde_1 = __webpack_require__(/*! ./tilde */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/tilde.js\");\nvar dieresis_1 = __webpack_require__(/*! ./dieresis */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/dieresis.js\");\nvar cedilla_1 = __webpack_require__(/*! ./cedilla */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/cedilla.js\");\nvar caron_1 = __webpack_require__(/*! ./caron */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/caron.js\");\nvar util_1 = __webpack_require__(/*! ../../../../util */ \"./node_modules/latex-to-unicode-converter/ts-compiled/util.js\");\nvar ogonek_1 = __webpack_require__(/*! ./ogonek */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/ogonek.js\");\nvar tie_letters_1 = __webpack_require__(/*! ./tie-letters */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/tie-letters.js\");\nvar vectorArrow_1 = __webpack_require__(/*! ./vectorArrow */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/vectorArrow.js\");\nvar long_hungarian_umlaut_1 = __webpack_require__(/*! ./long-hungarian-umlaut */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/long-hungarian-umlaut.js\");\nexports.barUnderLetter = util_1.simpleSuffix(\"\\u0331\");\nexports.dotUnderLetter = util_1.simpleSuffix(\"\\u0323\");\nexports.breve = util_1.simpleSuffix(\"\\u0306\");\nexports.macrron = util_1.simpleSuffix(\"\\u0304\");\nexports.dotOverLetter = util_1.simpleSuffix(\"\\u0307\");\nexports.modifiersTextModeUnicodeChart = {\n    \"`\": grave_1.graveAccent,\n    \"'\": acute_1.acuteAccent,\n    \"^\": circumflex_1.circumflex,\n    \"~\": tilde_1.tilde,\n    \"=\": exports.macrron,\n    \".\": exports.dotOverLetter,\n    '\"': dieresis_1.dieresis,\n    \"H\": long_hungarian_umlaut_1.longHungarianUmlaut,\n    \"c\": cedilla_1.cedilla,\n    \"k\": ogonek_1.ogonek,\n    \"b\": exports.barUnderLetter,\n    \"d\": exports.dotUnderLetter,\n    \"r\": mathring_1.ringOverLetter,\n    \"u\": exports.breve,\n    \"v\": caron_1.caron,\n    \"t\": tie_letters_1.tieLetters,\n};\nexports.modifiersMathModeUnicodeChart = {\n    \"check\": caron_1.caron,\n    \"acute\": acute_1.acuteAccent,\n    \"grave\": acute_1.acuteAccent,\n    \"breve\": exports.breve,\n    \"vec\": vectorArrow_1.vectorArrow,\n    \"mathring\": mathring_1.ringOverLetter,\n};\nexports.diacriticUnicode = function (str, arg) {\n    var fun = exports.modifiersTextModeUnicodeChart[str];\n    if (!fun)\n        fun = exports.modifiersMathModeUnicodeChart[str];\n    return fun && fun(arg);\n};\n//# sourceMappingURL=index.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/index.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/long-hungarian-umlaut.js":
+/*!************************************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/long-hungarian-umlaut.js ***!
+  \************************************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar command_expander_1 = __webpack_require__(/*! ../../command-expander */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/command-expander.js\");\nexports.longHungarianUmlaut = command_expander_1.lookupOrAppend({\n    o: \"ő\",\n    u: \"ű\",\n    O: \"Ő\",\n    U: \"Ű\",\n}, \"\\u030B\");\n//# sourceMappingURL=long-hungarian-umlaut.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/long-hungarian-umlaut.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/mathring.js":
+/*!***********************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/mathring.js ***!
+  \***********************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar command_expander_1 = __webpack_require__(/*! ../../command-expander */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/command-expander.js\");\nexports.ringOverLetter = command_expander_1.lookupOrAppend({\n    a: \"å\",\n    A: \"Å\",\n    y: \"ẙ\"\n}, \"\\u030A\");\n//# sourceMappingURL=mathring.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/mathring.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/ogonek.js":
+/*!*********************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/ogonek.js ***!
+  \*********************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar util_1 = __webpack_require__(/*! ../../../../util */ \"./node_modules/latex-to-unicode-converter/ts-compiled/util.js\");\nexports.ogonek = util_1.simpleSuffix(\"\\u0328\");\n//# sourceMappingURL=ogonek.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/ogonek.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/tie-letters.js":
+/*!**************************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/tie-letters.js ***!
+  \**************************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nfunction tieLetters(chars) {\n    return tie2Letters(chars.charAt(0), chars.substring(1));\n}\nexports.tieLetters = tieLetters;\nfunction tie2Letters(a, b) {\n    return a + \"͡\" + b;\n}\nexports.tie2Letters = tie2Letters;\nfunction isTieLetters(cmdName) {\n    return cmdName === \"t\";\n}\nexports.isTieLetters = isTieLetters;\n//# sourceMappingURL=tie-letters.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/tie-letters.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/tilde.js":
+/*!********************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/tilde.js ***!
+  \********************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar command_expander_1 = __webpack_require__(/*! ../../command-expander */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/command-expander.js\");\nexports.tilde = command_expander_1.lookupOrAppend({\n    o: \"õ\",\n    a: \"ã\",\n    n: \"ñ\",\n    O: \"Õ\",\n    A: \"Ã\",\n    N: \"Ñ\"\n}, \"\\u0303\");\n//# sourceMappingURL=tilde.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/tilde.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/vectorArrow.js":
+/*!**************************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/vectorArrow.js ***!
+  \**************************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar command_expander_1 = __webpack_require__(/*! ../../command-expander */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/command-expander.js\");\nexports.vectorArrow = command_expander_1.lookupOrAppend({}, \"\\u20D7\");\n//# sourceMappingURL=vectorArrow.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/vectorArrow.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/blackboard.js":
+/*!*************************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/blackboard.js ***!
+  \*************************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.blackboardCharacters = {\n    \"A\": \"𝔸\",\n    \"B\": \"𝔹\",\n    \"C\": \"ℂ\",\n    \"D\": \"𝔻\",\n    \"E\": \"𝔼\",\n    \"F\": \"𝔽\",\n    \"G\": \"𝔾\",\n    \"H\": \"ℍ\",\n    \"I\": \"𝕀\",\n    \"J\": \"𝕁\",\n    \"K\": \"𝕂\",\n    \"L\": \"𝕃\",\n    \"M\": \"𝕄\",\n    \"N\": \"ℕ\",\n    \"O\": \"𝕆\",\n    \"P\": \"ℙ\",\n    \"Q\": \"ℚ\",\n    \"R\": \"ℝ\",\n    \"S\": \"𝕊\",\n    \"T\": \"𝕋\",\n    \"U\": \"𝕌\",\n    \"V\": \"𝕍\",\n    \"W\": \"𝕎\",\n    \"X\": \"𝕏\",\n    \"Y\": \"𝕐\",\n    \"Z\": \"ℤ\",\n    \"a\": \"𝕒\",\n    \"b\": \"𝕓\",\n    \"c\": \"𝕔\",\n    \"d\": \"𝕕\",\n    \"e\": \"𝕖\",\n    \"f\": \"𝕗\",\n    \"g\": \"𝕘\",\n    \"h\": \"𝕙\",\n    \"i\": \"𝕚\",\n    \"j\": \"𝕛\",\n    \"k\": \"𝕜\",\n    \"l\": \"𝕝\",\n    \"m\": \"𝕞\",\n    \"n\": \"𝕟\",\n    \"o\": \"𝕠\",\n    \"p\": \"𝕡\",\n    \"q\": \"𝕢\",\n    \"r\": \"𝕣\",\n    \"s\": \"𝕤\",\n    \"t\": \"𝕥\",\n    \"u\": \"𝕦\",\n    \"v\": \"𝕧\",\n    \"w\": \"𝕨\",\n    \"x\": \"𝕩\",\n    \"y\": \"𝕪\",\n    \"z\": \"𝕫\",\n    \"0\": \"𝟘\",\n    \"1\": \"𝟙\",\n    \"2\": \"𝟚\",\n    \"3\": \"𝟛\",\n    \"4\": \"𝟜\",\n    \"5\": \"𝟝\",\n    \"6\": \"𝟞\",\n    \"7\": \"𝟟\",\n    \"8\": \"𝟠\",\n    \"9\": \"𝟡\"\n};\nfunction isBlackboardCharacter(x) {\n    return exports.blackboardCharacters.hasOwnProperty(x);\n}\nexports.isBlackboardCharacter = isBlackboardCharacter;\nexports.translateCharToBlackboard = function (char) { return isBlackboardCharacter(char) ? exports.blackboardCharacters[char] : undefined; };\n//# sourceMappingURL=blackboard.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/blackboard.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/boldfont.js":
+/*!***********************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/boldfont.js ***!
+  \***********************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.boldCharacters = {\n    \"A\": \"𝐀\",\n    \"B\": \"𝐁\",\n    \"C\": \"𝐂\",\n    \"D\": \"𝐃\",\n    \"E\": \"𝐄\",\n    \"F\": \"𝐅\",\n    \"G\": \"𝐆\",\n    \"H\": \"𝐇\",\n    \"I\": \"𝐈\",\n    \"J\": \"𝐉\",\n    \"K\": \"𝐊\",\n    \"L\": \"𝐋\",\n    \"M\": \"𝐌\",\n    \"N\": \"𝐍\",\n    \"O\": \"𝐎\",\n    \"P\": \"𝐏\",\n    \"Q\": \"𝐐\",\n    \"R\": \"𝐑\",\n    \"S\": \"𝐒\",\n    \"T\": \"𝐓\",\n    \"U\": \"𝐔\",\n    \"V\": \"𝐕\",\n    \"W\": \"𝐖\",\n    \"X\": \"𝐗\",\n    \"Y\": \"𝐘\",\n    \"Z\": \"𝐙\",\n    \"a\": \"𝐚\",\n    \"b\": \"𝐛\",\n    \"c\": \"𝐜\",\n    \"d\": \"𝐝\",\n    \"e\": \"𝐞\",\n    \"f\": \"𝐟\",\n    \"g\": \"𝐠\",\n    \"h\": \"𝐡\",\n    \"i\": \"𝐢\",\n    \"j\": \"𝐣\",\n    \"k\": \"𝐤\",\n    \"l\": \"𝐥\",\n    \"m\": \"𝐦\",\n    \"n\": \"𝐧\",\n    \"o\": \"𝐨\",\n    \"p\": \"𝐩\",\n    \"q\": \"𝐪\",\n    \"r\": \"𝐫\",\n    \"s\": \"𝐬\",\n    \"t\": \"𝐭\",\n    \"u\": \"𝐮\",\n    \"v\": \"𝐯\",\n    \"w\": \"𝐰\",\n    \"x\": \"𝐱\",\n    \"y\": \"𝐲\",\n    \"z\": \"𝐳\",\n    \"Α\": \"𝚨\",\n    \"Β\": \"𝚩\",\n    \"Γ\": \"𝚪\",\n    \"Δ\": \"𝚫\",\n    \"Ε\": \"𝚬\",\n    \"Ζ\": \"𝚭\",\n    \"Η\": \"𝚮\",\n    \"Θ\": \"𝚯\",\n    \"Ι\": \"𝚰\",\n    \"Κ\": \"𝚱\",\n    \"Λ\": \"𝚲\",\n    \"Μ\": \"𝚳\",\n    \"Ν\": \"𝚴\",\n    \"Ξ\": \"𝚵\",\n    \"Ο\": \"𝚶\",\n    \"Π\": \"𝚷\",\n    \"Ρ\": \"𝚸\",\n    \"ϴ\": \"𝚹\",\n    \"Σ\": \"𝚺\",\n    \"Τ\": \"𝚻\",\n    \"Υ\": \"𝚼\",\n    \"Φ\": \"𝚽\",\n    \"Χ\": \"𝚾\",\n    \"Ψ\": \"𝚿\",\n    \"Ω\": \"𝛀\",\n    \"∇\": \"𝛁\",\n    \"α\": \"𝛂\",\n    \"β\": \"𝛃\",\n    \"γ\": \"𝛄\",\n    \"δ\": \"𝛅\",\n    \"ε\": \"𝛆\",\n    \"ζ\": \"𝛇\",\n    \"η\": \"𝛈\",\n    \"θ\": \"𝛉\",\n    \"ι\": \"𝛊\",\n    \"κ\": \"𝛋\",\n    \"λ\": \"𝛌\",\n    \"μ\": \"𝛍\",\n    \"ν\": \"𝛎\",\n    \"ξ\": \"𝛏\",\n    \"ο\": \"𝛐\",\n    \"π\": \"𝛑\",\n    \"ρ\": \"𝛒\",\n    \"ς\": \"𝛓\",\n    \"σ\": \"𝛔\",\n    \"τ\": \"𝛕\",\n    \"υ\": \"𝛖\",\n    \"φ\": \"𝛗\",\n    \"χ\": \"𝛘\",\n    \"ψ\": \"𝛙\",\n    \"ω\": \"𝛚\",\n    \"∂\": \"𝛛\",\n    \"ϵ\": \"𝛜\",\n    \"ϑ\": \"𝛝\",\n    \"ϰ\": \"𝛞\",\n    \"ϕ\": \"𝛟\",\n    \"ϱ\": \"𝛠\",\n    \"ϖ\": \"𝛡\",\n    \"0\": \"𝟎\",\n    \"1\": \"𝟏\",\n    \"2\": \"𝟐\",\n    \"3\": \"𝟑\",\n    \"4\": \"𝟒\",\n    \"5\": \"𝟓\",\n    \"6\": \"𝟔\",\n    \"7\": \"𝟕\",\n    \"8\": \"𝟖\",\n    \"9\": \"𝟗\"\n};\nfunction isBlackboardCharacter(x) {\n    return exports.boldCharacters.hasOwnProperty(x);\n}\nexports.isBlackboardCharacter = isBlackboardCharacter;\nexports.translateCharToBold = function (char) { return isBlackboardCharacter(char) ? exports.boldCharacters[char] : undefined; };\n//# sourceMappingURL=boldfont.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/boldfont.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/fraktur.js":
+/*!**********************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/fraktur.js ***!
+  \**********************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.frakturCharacters = {\n    \"A\": \"𝔄\",\n    \"B\": \"𝔅\",\n    \"C\": \"ℭ\",\n    \"D\": \"𝔇\",\n    \"E\": \"𝔈\",\n    \"F\": \"𝔉\",\n    \"G\": \"𝔊\",\n    \"H\": \"ℌ\",\n    \"I\": \"ℑ\",\n    \"J\": \"𝔍\",\n    \"K\": \"𝔎\",\n    \"L\": \"𝔏\",\n    \"M\": \"𝔐\",\n    \"N\": \"𝔑\",\n    \"O\": \"𝔒\",\n    \"P\": \"𝔓\",\n    \"Q\": \"𝔔\",\n    \"R\": \"ℜ\",\n    \"S\": \"𝔖\",\n    \"T\": \"𝔗\",\n    \"U\": \"𝔘\",\n    \"V\": \"𝔙\",\n    \"W\": \"𝔚\",\n    \"X\": \"𝔛\",\n    \"Y\": \"𝔜\",\n    \"Z\": \"ℨ\",\n    \"a\": \"𝔞\",\n    \"b\": \"𝔟\",\n    \"c\": \"𝔠\",\n    \"d\": \"𝔡\",\n    \"e\": \"𝔢\",\n    \"f\": \"𝔣\",\n    \"g\": \"𝔤\",\n    \"h\": \"𝔥\",\n    \"i\": \"𝔦\",\n    \"j\": \"𝔧\",\n    \"k\": \"𝔨\",\n    \"l\": \"𝔩\",\n    \"m\": \"𝔪\",\n    \"n\": \"𝔫\",\n    \"o\": \"𝔬\",\n    \"p\": \"𝔭\",\n    \"q\": \"𝔮\",\n    \"r\": \"𝔯\",\n    \"s\": \"𝔰\",\n    \"t\": \"𝔱\",\n    \"u\": \"𝔲\",\n    \"v\": \"𝔳\",\n    \"w\": \"𝔴\",\n    \"x\": \"𝔵\",\n    \"y\": \"𝔶\",\n    \"z\": \"𝔷\"\n};\nfunction isFrakturCharacter(x) {\n    return exports.frakturCharacters.hasOwnProperty(x);\n}\nexports.isFrakturCharacter = isFrakturCharacter;\nexports.translateCharToFraktur = function (char) { return isFrakturCharacter(char) ? exports.frakturCharacters[char] : undefined; };\n//# sourceMappingURL=fraktur.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/fraktur.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/index.js":
+/*!********************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/index.js ***!
+  \********************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar blackboard_1 = __webpack_require__(/*! ./blackboard */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/blackboard.js\");\nvar boldfont_1 = __webpack_require__(/*! ./boldfont */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/boldfont.js\");\nvar fraktur_1 = __webpack_require__(/*! ./fraktur */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/fraktur.js\");\nvar italic_1 = __webpack_require__(/*! ./italic */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/italic.js\");\nvar monospace_1 = __webpack_require__(/*! ./monospace */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/monospace.js\");\nvar textcal_1 = __webpack_require__(/*! ./textcal */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/textcal.js\");\nvar formatting_1 = __webpack_require__(/*! ../../../../latex/commands/1args/formatting */ \"./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/formatting.js\");\nvar subscript_1 = __webpack_require__(/*! ./subscript */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/subscript.js\");\nvar superscript_1 = __webpack_require__(/*! ./superscript */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/superscript.js\");\nvar mono_1 = __webpack_require__(/*! ./mono */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/mono.js\");\nexports.formattingUnicode = function (cmdName, arg) {\n    var fn = undefined;\n    if (formatting_1.isBbCmd(cmdName))\n        fn = blackboard_1.translateCharToBlackboard;\n    else if (formatting_1.isBfCmd(cmdName))\n        fn = boldfont_1.translateCharToBold;\n    else if (formatting_1.isFrakCmd(cmdName))\n        fn = fraktur_1.translateCharToFraktur;\n    else if (formatting_1.isItCmd(cmdName))\n        fn = italic_1.translateCharToItalic;\n    else if (formatting_1.isTtCmd(cmdName))\n        fn = monospace_1.translateCharToMonospace;\n    else if (formatting_1.isCalCmd(cmdName))\n        fn = textcal_1.translateCharToCalligraphic;\n    else if (formatting_1.isSubCmd(cmdName))\n        fn = subscript_1.translateCharToSubscript;\n    else if (formatting_1.isSupCmd(cmdName))\n        fn = superscript_1.translateCharToSuperscript;\n    else if (formatting_1.isMonoCmd(cmdName))\n        fn = mono_1.translateCharToMono;\n    if (!!fn) {\n        var fun_1 = fn;\n        return arg.split(\"\").map(function (char) { return (fun_1(char) || char); }).join(\"\");\n    }\n    else\n        return undefined;\n};\n//# sourceMappingURL=index.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/index.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/italic.js":
+/*!*********************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/italic.js ***!
+  \*********************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.italicCharacters = {\n    \"A\": \"𝐴\",\n    \"B\": \"𝐵\",\n    \"C\": \"𝐶\",\n    \"D\": \"𝐷\",\n    \"E\": \"𝐸\",\n    \"F\": \"𝐹\",\n    \"G\": \"𝐺\",\n    \"H\": \"𝐻\",\n    \"I\": \"𝐼\",\n    \"J\": \"𝐽\",\n    \"K\": \"𝐾\",\n    \"L\": \"𝐿\",\n    \"M\": \"𝑀\",\n    \"N\": \"𝑁\",\n    \"O\": \"𝑂\",\n    \"P\": \"𝑃\",\n    \"Q\": \"𝑄\",\n    \"R\": \"𝑅\",\n    \"S\": \"𝑆\",\n    \"T\": \"𝑇\",\n    \"U\": \"𝑈\",\n    \"V\": \"𝑉\",\n    \"W\": \"𝑊\",\n    \"X\": \"𝑋\",\n    \"Y\": \"𝑌\",\n    \"Z\": \"𝑍\",\n    \"a\": \"𝑎\",\n    \"b\": \"𝑏\",\n    \"c\": \"𝑐\",\n    \"d\": \"𝑑\",\n    \"e\": \"𝑒\",\n    \"f\": \"𝑓\",\n    \"g\": \"𝑔\",\n    \"h\": \"ℎ\",\n    \"i\": \"𝑖\",\n    \"j\": \"𝑗\",\n    \"k\": \"𝑘\",\n    \"l\": \"𝑙\",\n    \"m\": \"𝑚\",\n    \"n\": \"𝑛\",\n    \"o\": \"𝑜\",\n    \"p\": \"𝑝\",\n    \"q\": \"𝑞\",\n    \"r\": \"𝑟\",\n    \"s\": \"𝑠\",\n    \"t\": \"𝑡\",\n    \"u\": \"𝑢\",\n    \"v\": \"𝑣\",\n    \"w\": \"𝑤\",\n    \"x\": \"𝑥\",\n    \"y\": \"𝑦\",\n    \"z\": \"𝑧\",\n    \"Α\": \"𝛢\",\n    \"Β\": \"𝛣\",\n    \"Γ\": \"𝛤\",\n    \"Δ\": \"𝛥\",\n    \"Ε\": \"𝛦\",\n    \"Ζ\": \"𝛧\",\n    \"Η\": \"𝛨\",\n    \"Θ\": \"𝛩\",\n    \"Ι\": \"𝛪\",\n    \"Κ\": \"𝛫\",\n    \"Λ\": \"𝛬\",\n    \"Μ\": \"𝛭\",\n    \"Ν\": \"𝛮\",\n    \"Ξ\": \"𝛯\",\n    \"Ο\": \"𝛰\",\n    \"Π\": \"𝛱\",\n    \"Ρ\": \"𝛲\",\n    \"ϴ\": \"𝛳\",\n    \"Σ\": \"𝛴\",\n    \"Τ\": \"𝛵\",\n    \"Υ\": \"𝛶\",\n    \"Φ\": \"𝛷\",\n    \"Χ\": \"𝛸\",\n    \"Ψ\": \"𝛹\",\n    \"Ω\": \"𝛺\",\n    \"∇\": \"𝛻\",\n    \"α\": \"𝛼\",\n    \"β\": \"𝛽\",\n    \"γ\": \"𝛾\",\n    \"δ\": \"𝛿\",\n    \"ε\": \"𝜀\",\n    \"ζ\": \"𝜁\",\n    \"η\": \"𝜂\",\n    \"θ\": \"𝜃\",\n    \"ι\": \"𝜄\",\n    \"κ\": \"𝜅\",\n    \"λ\": \"𝜆\",\n    \"μ\": \"𝜇\",\n    \"ν\": \"𝜈\",\n    \"ξ\": \"𝜉\",\n    \"ο\": \"𝜊\",\n    \"π\": \"𝜋\",\n    \"ρ\": \"𝜌\",\n    \"ς\": \"𝜍\",\n    \"σ\": \"𝜎\",\n    \"τ\": \"𝜏\",\n    \"υ\": \"𝜐\",\n    \"φ\": \"𝜑\",\n    \"χ\": \"𝜒\",\n    \"ψ\": \"𝜓\",\n    \"ω\": \"𝜔\",\n    \"∂\": \"𝜕\",\n    \"ϵ\": \"𝜖\",\n    \"ϑ\": \"𝜗\",\n    \"ϰ\": \"𝜘\",\n    \"ϕ\": \"𝜙\",\n    \"ϱ\": \"𝜚\",\n    \"ϖ\": \"𝜛\"\n};\nfunction isItalicCharacter(x) {\n    return exports.italicCharacters.hasOwnProperty(x);\n}\nexports.isItalicCharacter = isItalicCharacter;\nexports.translateCharToItalic = function (char) { return isItalicCharacter(char) ? exports.italicCharacters[char] : undefined; };\n//# sourceMappingURL=italic.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/italic.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/mono.js":
+/*!*******************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/mono.js ***!
+  \*******************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.monoCharacters = {\n    \"A\": \"𝙰\",\n    \"B\": \"𝙱\",\n    \"C\": \"𝙲\",\n    \"D\": \"𝙳\",\n    \"E\": \"𝙴\",\n    \"F\": \"𝙵\",\n    \"G\": \"𝙶\",\n    \"H\": \"𝙷\",\n    \"I\": \"𝙸\",\n    \"J\": \"𝙹\",\n    \"K\": \"𝙺\",\n    \"L\": \"𝙻\",\n    \"M\": \"𝙼\",\n    \"N\": \"𝙽\",\n    \"O\": \"𝙾\",\n    \"P\": \"𝙿\",\n    \"Q\": \"𝚀\",\n    \"R\": \"𝚁\",\n    \"S\": \"𝚂\",\n    \"T\": \"𝚃\",\n    \"U\": \"𝚄\",\n    \"V\": \"𝚅\",\n    \"W\": \"𝚆\",\n    \"X\": \"𝚇\",\n    \"Y\": \"𝚈\",\n    \"Z\": \"𝚉\",\n    \"a\": \"𝚊\",\n    \"b\": \"𝚋\",\n    \"c\": \"𝚌\",\n    \"d\": \"𝚍\",\n    \"e\": \"𝚎\",\n    \"f\": \"𝚏\",\n    \"g\": \"𝚐\",\n    \"h\": \"𝚑\",\n    \"i\": \"𝚒\",\n    \"j\": \"𝚓\",\n    \"k\": \"𝚔\",\n    \"l\": \"𝚕\",\n    \"m\": \"𝚖\",\n    \"n\": \"𝚗\",\n    \"o\": \"𝚘\",\n    \"p\": \"𝚙\",\n    \"q\": \"𝚚\",\n    \"r\": \"𝚛\",\n    \"s\": \"𝚜\",\n    \"t\": \"𝚝\",\n    \"u\": \"𝚞\",\n    \"v\": \"𝚟\",\n    \"w\": \"𝚠\",\n    \"x\": \"𝚡\",\n    \"y\": \"𝚢\",\n    \"z\": \"𝚣\",\n    \"0\": \"𝟶\",\n    \"1\": \"𝟷\",\n    \"2\": \"𝟸\",\n    \"3\": \"𝟹\",\n    \"4\": \"𝟺\",\n    \"5\": \"𝟻\",\n    \"6\": \"𝟼\",\n    \"7\": \"𝟽\",\n    \"8\": \"𝟾\",\n    \"9\": \"𝟿\",\n};\nfunction isMonoCharacter(x) {\n    return exports.monoCharacters.hasOwnProperty(x);\n}\nexports.isMonoCharacter = isMonoCharacter;\nexports.translateCharToMono = function (char) { return isMonoCharacter(char) ? exports.monoCharacters[char] : undefined; };\n//# sourceMappingURL=mono.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/mono.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/monospace.js":
+/*!************************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/monospace.js ***!
+  \************************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.monospaceCharacters = {\n    \"A\": \"𝙰\",\n    \"B\": \"𝙱\",\n    \"C\": \"𝙲\",\n    \"D\": \"𝙳\",\n    \"E\": \"𝙴\",\n    \"F\": \"𝙵\",\n    \"G\": \"𝙶\",\n    \"H\": \"𝙷\",\n    \"I\": \"𝙸\",\n    \"J\": \"𝙹\",\n    \"K\": \"𝙺\",\n    \"L\": \"𝙻\",\n    \"M\": \"𝙼\",\n    \"N\": \"𝙽\",\n    \"O\": \"𝙾\",\n    \"P\": \"𝙿\",\n    \"Q\": \"𝚀\",\n    \"R\": \"𝚁\",\n    \"S\": \"𝚂\",\n    \"T\": \"𝚃\",\n    \"U\": \"𝚄\",\n    \"V\": \"𝚅\",\n    \"W\": \"𝚆\",\n    \"X\": \"𝚇\",\n    \"Y\": \"𝚈\",\n    \"Z\": \"𝚉\",\n    \"a\": \"𝚊\",\n    \"b\": \"𝚋\",\n    \"c\": \"𝚌\",\n    \"d\": \"𝚍\",\n    \"e\": \"𝚎\",\n    \"f\": \"𝚏\",\n    \"g\": \"𝚐\",\n    \"h\": \"𝚑\",\n    \"i\": \"𝚒\",\n    \"j\": \"𝚓\",\n    \"k\": \"𝚔\",\n    \"l\": \"𝚕\",\n    \"m\": \"𝚖\",\n    \"n\": \"𝚗\",\n    \"o\": \"𝚘\",\n    \"p\": \"𝚙\",\n    \"q\": \"𝚚\",\n    \"r\": \"𝚛\",\n    \"s\": \"𝚜\",\n    \"t\": \"𝚝\",\n    \"u\": \"𝚞\",\n    \"v\": \"𝚟\",\n    \"w\": \"𝚠\",\n    \"x\": \"𝚡\",\n    \"y\": \"𝚢\",\n    \"z\": \"𝚣\",\n    \"0\": \"𝟶\",\n    \"1\": \"𝟷\",\n    \"2\": \"𝟸\",\n    \"3\": \"𝟹\",\n    \"4\": \"𝟺\",\n    \"5\": \"𝟻\",\n    \"6\": \"𝟼\",\n    \"7\": \"𝟽\",\n    \"8\": \"𝟾\",\n    \"9\": \"𝟿\"\n};\nfunction isMonospaceCharacter(x) {\n    return exports.monospaceCharacters.hasOwnProperty(x);\n}\nexports.isMonospaceCharacter = isMonospaceCharacter;\nexports.translateCharToMonospace = function (char) { return isMonospaceCharacter(char) ? exports.monospaceCharacters[char] : undefined; };\n//# sourceMappingURL=monospace.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/monospace.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/subscript.js":
+/*!************************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/subscript.js ***!
+  \************************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.subscriptCharacters = {\n    \"0\": \"₀\",\n    \"1\": \"₁\",\n    \"2\": \"₂\",\n    \"3\": \"₃\",\n    \"4\": \"₄\",\n    \"5\": \"₅\",\n    \"6\": \"₆\",\n    \"7\": \"₇\",\n    \"8\": \"₈\",\n    \"9\": \"₉\",\n    \"+\": \"₊\",\n    \"-\": \"₋\",\n    \"=\": \"₌\",\n    \"(\": \"₍\",\n    \")\": \"₎\",\n    \"a\": \"ₐ\",\n    \"e\": \"ₑ\",\n    \"h\": \"ₕ\",\n    \"i\": \"ᵢ\",\n    \"j\": \"ⱼ\",\n    k: \"ₖ\",\n    l: \"ₗ\",\n    m: \"ₘ\",\n    n: \"ₙ\",\n    \"o\": \"ₒ\",\n    p: \"ₚ\",\n    \"r\": \"ᵣ\",\n    s: \"ₛ\",\n    t: \"ₜ\",\n    \"u\": \"ᵤ\",\n    \"v\": \"ᵥ\",\n    \"x\": \"ₓ\",\n    \"β\": \"ᵦ\",\n    \"γ\": \"ᵧ\",\n    \"ρ\": \"ᵨ\",\n    \"φ\": \"ᵩ\",\n    \"χ\": \"ᵪ\"\n};\nfunction isSubscriptCharacter(x) {\n    return exports.subscriptCharacters.hasOwnProperty(x);\n}\nexports.isSubscriptCharacter = isSubscriptCharacter;\nexports.translateCharToSubscript = function (char) { return isSubscriptCharacter(char) ? exports.subscriptCharacters[char] : undefined; };\n//# sourceMappingURL=subscript.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/subscript.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/superscript.js":
+/*!**************************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/superscript.js ***!
+  \**************************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.superscriptCharacters = {\n    \"0\": \"⁰\",\n    \"1\": \"¹\",\n    \"2\": \"²\",\n    \"3\": \"³\",\n    \"4\": \"⁴\",\n    \"5\": \"⁵\",\n    \"6\": \"⁶\",\n    \"7\": \"⁷\",\n    \"8\": \"⁸\",\n    \"9\": \"⁹\",\n    \"+\": \"⁺\",\n    \"-\": \"⁻\",\n    \"=\": \"⁼\",\n    \"(\": \"⁽\",\n    \")\": \"⁾\",\n    \"a\": \"ᵃ\",\n    \"b\": \"ᵇ\",\n    \"c\": \"ᶜ\",\n    \"d\": \"ᵈ\",\n    \"e\": \"ᵉ\",\n    \"f\": \"ᶠ\",\n    \"g\": \"ᵍ\",\n    \"h\": \"ʰ\",\n    \"i\": \"ⁱ\",\n    \"j\": \"ʲ\",\n    \"k\": \"ᵏ\",\n    \"l\": \"ˡ\",\n    \"m\": \"ᵐ\",\n    \"n\": \"ⁿ\",\n    \"o\": \"ᵒ\",\n    \"p\": \"ᵖ\",\n    \"r\": \"ʳ\",\n    \"s\": \"ˢ\",\n    \"t\": \"ᵗ\",\n    \"u\": \"ᵘ\",\n    \"v\": \"ᵛ\",\n    \"w\": \"ʷ\",\n    \"x\": \"ˣ\",\n    \"y\": \"ʸ\",\n    \"z\": \"ᶻ\",\n    \"A\": \"ᴬ\",\n    \"B\": \"ᴮ\",\n    \"D\": \"ᴰ\",\n    \"E\": \"ᴱ\",\n    \"G\": \"ᴳ\",\n    \"H\": \"ᴴ\",\n    \"I\": \"ᴵ\",\n    \"J\": \"ᴶ\",\n    \"K\": \"ᴷ\",\n    \"L\": \"ᴸ\",\n    \"M\": \"ᴹ\",\n    \"N\": \"ᴺ\",\n    \"O\": \"ᴼ\",\n    \"P\": \"ᴾ\",\n    \"R\": \"ᴿ\",\n    \"T\": \"ᵀ\",\n    \"U\": \"ᵁ\",\n    \"V\": \"ⱽ\",\n    \"W\": \"ᵂ\",\n    \"α\": \"ᵅ\",\n    \"β\": \"ᵝ\",\n    \"γ\": \"ᵞ\",\n    \"δ\": \"ᵟ\",\n    \"∊\": \"ᵋ\",\n    \"θ\": \"ᶿ\",\n    \"ι\": \"ᶥ\",\n    \"Φ\": \"ᶲ\",\n    \"φ\": \"ᵠ\",\n    \"χ\": \"ᵡ\"\n};\nfunction isSuperscriptCharacter(x) {\n    return exports.superscriptCharacters.hasOwnProperty(x);\n}\nexports.isSuperscriptCharacter = isSuperscriptCharacter;\nexports.translateCharToSuperscript = function (char) { return isSuperscriptCharacter(char) ? exports.superscriptCharacters[char] : undefined; };\n//# sourceMappingURL=superscript.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/superscript.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/textcal.js":
+/*!**********************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/textcal.js ***!
+  \**********************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.calligraphicLetters = {\n    \"A\": \"𝓐\",\n    \"B\": \"𝓑\",\n    \"C\": \"𝓒\",\n    \"D\": \"𝓓\",\n    \"E\": \"𝓔\",\n    \"F\": \"𝓕\",\n    \"G\": \"𝓖\",\n    \"H\": \"𝓗\",\n    \"I\": \"𝓘\",\n    \"J\": \"𝓙\",\n    \"K\": \"𝓚\",\n    \"L\": \"𝓛\",\n    \"M\": \"𝓜\",\n    \"N\": \"𝓝\",\n    \"O\": \"𝓞\",\n    \"P\": \"𝓟\",\n    \"Q\": \"𝓠\",\n    \"R\": \"𝓡\",\n    \"S\": \"𝓢\",\n    \"T\": \"𝓣\",\n    \"U\": \"𝓤\",\n    \"V\": \"𝓥\",\n    \"W\": \"𝓦\",\n    \"X\": \"𝓧\",\n    \"Y\": \"𝓨\",\n    \"Z\": \"𝓩\",\n    \"a\": \"𝓪\",\n    \"b\": \"𝓫\",\n    \"c\": \"𝓬\",\n    \"d\": \"𝓭\",\n    \"e\": \"𝓮\",\n    \"f\": \"𝓯\",\n    \"g\": \"𝓰\",\n    \"h\": \"𝓱\",\n    \"i\": \"𝓲\",\n    \"j\": \"𝓳\",\n    \"k\": \"𝓴\",\n    \"l\": \"𝓵\",\n    \"m\": \"𝓶\",\n    \"n\": \"𝓷\",\n    \"o\": \"𝓸\",\n    \"p\": \"𝓹\",\n    \"q\": \"𝓺\",\n    \"r\": \"𝓻\",\n    \"s\": \"𝓼\",\n    \"t\": \"𝓽\",\n    \"u\": \"𝓾\",\n    \"v\": \"𝓿\",\n    \"w\": \"𝔀\",\n    \"x\": \"𝔁\",\n    \"y\": \"𝔂\",\n    \"z\": \"𝔃\"\n};\nfunction isCalligraphicLetter(x) {\n    return exports.calligraphicLetters.hasOwnProperty(x);\n}\nexports.isCalligraphicLetter = isCalligraphicLetter;\nexports.translateCharToCalligraphic = function (char) { return isCalligraphicLetter(char) ? exports.calligraphicLetters[char] : undefined; };\n//# sourceMappingURL=textcal.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/textcal.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/index.js":
+/*!*********************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/index.js ***!
+  \*********************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar index_1 = __webpack_require__(/*! ./diacritics/index */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/diacritics/index.js\");\nvar index_2 = __webpack_require__(/*! ./formatting/index */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/index.js\");\nvar cyrillic_1 = __webpack_require__(/*! ./letters/cyrillic */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/letters/cyrillic.js\");\nvar dingbats_1 = __webpack_require__(/*! ./symbols/dingbats */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/symbols/dingbats.js\");\nvar elsevier_1 = __webpack_require__(/*! ./symbols/elsevier */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/symbols/elsevier.js\");\nvar runes_1 = __webpack_require__(/*! ./symbols/runes */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/symbols/runes.js\");\nfunction expand1argsCommand(name, arg) {\n    switch (name) {\n        case \"cyrchar\":\n            var c = cyrillic_1.translateCharToCyrillic(arg);\n            if (!!c)\n                return c;\n            break;\n        case \"ding\":\n        case \"dingbat\":\n            var d = dingbats_1.translateCharToDingbat(arg);\n            if (!!d)\n                return d;\n            break;\n        case \"ElsevierGlyph\":\n        case \"elsevierglyph\":\n        case \"elsevier\":\n        case \"Elsevier\":\n            var e = elsevier_1.translateCharToElsevier(arg);\n            if (!!e)\n                return e;\n            break;\n        default:\n            for (var _i = 0, _a = [\n                index_1.diacriticUnicode,\n                index_2.formattingUnicode,\n                runes_1.runeUnicode,\n            ]; _i < _a.length; _i++) {\n                var fn = _a[_i];\n                var result = fn(name, arg);\n                if (!!result)\n                    return result;\n            }\n    }\n    throw new Error(\"No implementation found to expand \\\\\" + name + \" with argument {\" + arg + \"}\");\n}\nexports.expand1argsCommand = expand1argsCommand;\n//# sourceMappingURL=index.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/index.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/letters/cyrillic.js":
+/*!********************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/letters/cyrillic.js ***!
+  \********************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.cyrillicCharacters = {\n    \"Ф\": \"Ф\",\n    \"І\": \"І\",\n    \"Ѡ\": \"Ѡ\",\n    \"Г\": \"Г\",\n    \"ҝ\": \"ҝ\",\n    \"ё\": \"ё\",\n    \"Х\": \"Х\",\n    \"Җ\": \"Җ\",\n    \"ҧ\": \"ҧ\",\n    \"Ҭ\": \"Ҭ\",\n    \"И\": \"И\",\n    \"ї\": \"ї\",\n    \"Џ\": \"Џ\",\n    \"ѥ\": \"ѥ\",\n    \"К\": \"К\",\n    \"Һ\": \"Һ\",\n    \"Л\": \"Л\",\n    \"М\": \"М\",\n    \"Ӌ\": \"Ӌ\",\n    \"Њ\": \"Њ\",\n    \"Ѣ\": \"Ѣ\",\n    \"А\": \"А\",\n    \"Б\": \"Б\",\n    \"ҷ\": \"ҷ\",\n    \"ә\": \"ә\",\n    \"Ѕ\": \"Ѕ\",\n    \"Є\": \"Є\",\n    \"Ц\": \"Ц\",\n    \"Ж\": \"Ж\",\n    \"Д\": \"Д\",\n    \"Ҿ\": \"Ҿ\",\n    \"Ѳ\": \"Ѳ\",\n    \"Е\": \"Е\",\n    \"Ҩ\": \"Ҩ\",\n    \"я\": \"я\",\n    \"џ\": \"џ\",\n    \"Ѩ\": \"Ѩ\",\n    \"ҍ\": \"ҍ\",\n    \"В\": \"В\",\n    \"й\": \"й\",\n    \"ђ\": \"ђ\",\n    \"ӌ\": \"ӌ\",\n    \"Ү\": \"Ү\",\n    \"ң\": \"ң\",\n    \"З\": \"З\",\n    \"Ҟ\": \"Ҟ\",\n    \"Ҥ\": \"Ҥ\",\n    \"Ҷ\": \"Ҷ\",\n    \"Ұ\": \"Ұ\",\n    \"Щ\": \"Щ\",\n    \"Ў\": \"Ў\",\n    \"ю\": \"ю\",\n    \"ѯ\": \"ѯ\",\n    \"Н\": \"Н\",\n    \"О\": \"О\",\n    \"Ѫ\": \"Ѫ\",\n    \"П\": \"П\",\n    \"Ҙ\": \"Ҙ\",\n    \"Ӕ\": \"Ӕ\",\n    \"Р\": \"Р\",\n    \"С\": \"С\",\n    \"Т\": \"Т\",\n    \"Ҽ\": \"Ҽ\",\n    \"ѹ\": \"ѹ\",\n    \"У\": \"У\",\n    \"і\": \"і\",\n    \"Ҍ\": \"Ҍ\",\n    \"ғ\": \"ғ\",\n    \"Й\": \"Й\",\n    \"ѽ\": \"ѽ\",\n    \"ҡ\": \"ҡ\",\n    \"є\": \"є\",\n    \"ҙ\": \"ҙ\",\n    \"Ң\": \"Ң\",\n    \"Ґ\": \"Ґ\",\n    \"щ\": \"щ\",\n    \"Ӄ\": \"Ӄ\",\n    \"ж\": \"ж\",\n    \"Ј\": \"Ј\",\n    \"҂\": \"҂\",\n    \"ҽ\": \"ҽ\",\n    \"№\": \"№\",\n    \"ҥ\": \"ҥ\",\n    \"Ѱ\": \"Ѱ\",\n    \"Ҵ\": \"Ҵ\",\n    \"Ѭ\": \"Ѭ\",\n    \"њ\": \"њ\",\n    \"Ѥ\": \"Ѥ\",\n    \"ѕ\": \"ѕ\",\n    \"ӕ\": \"ӕ\",\n    \"Ъ\": \"Ъ\",\n    \"Ҁ\": \"Ҁ\",\n    \"Ҏ\": \"Ҏ\",\n    \"Ә\": \"Ә\",\n    \"ҭ\": \"ҭ\",\n    \"Ҕ\": \"Ҕ\",\n    \"ҩ\": \"ҩ\",\n    \"һ\": \"һ\",\n    \"Ш\": \"Ш\",\n    \"у\": \"у\",\n    \"ҟ\": \"ҟ\",\n    \"т\": \"т\",\n    \"Ы\": \"Ы\",\n    \"с\": \"с\",\n    \"р\": \"р\",\n    \"Ѿ\": \"Ѿ\",\n    \"ѧ\": \"ѧ\",\n    \"Ӈ\": \"Ӈ\",\n    \"Ь\": \"Ь\",\n    \"ҕ\": \"ҕ\",\n    \"п\": \"п\",\n    \"ӡ\": \"ӡ\",\n    \"о\": \"о\",\n    \"Ћ\": \"Ћ\",\n    \"н\": \"н\",\n    \"Ҫ\": \"Ҫ\",\n    \"ұ\": \"ұ\",\n    \"ѱ\": \"ѱ\",\n    \"з\": \"з\",\n    \"ү\": \"ү\",\n    \"\\u030F\": \"\\u030F\",\n    \"ј\": \"ј\",\n    \"в\": \"в\",\n    \"ҹ\": \"ҹ\",\n    \"ӄ\": \"ӄ\",\n    \"е\": \"е\",\n    \"ѡ\": \"ѡ\",\n    \"д\": \"д\",\n    \"ц\": \"ц\",\n    \"б\": \"б\",\n    \"Ө\": \"Ө\",\n    \"ґ\": \"ґ\",\n    \"Љ\": \"Љ\",\n    \"а\": \"а\",\n    \"Ѽ\": \"Ѽ\",\n    \"Ғ\": \"Ғ\",\n    \"Ҹ\": \"Ҹ\",\n    \"м\": \"м\",\n    \"л\": \"л\",\n    \"ш\": \"ш\",\n    \"к\": \"к\",\n    \"и\": \"и\",\n    \"х\": \"х\",\n    \"Ҳ\": \"Ҳ\",\n    \"Ѵ\": \"Ѵ\",\n    \"Ӡ\": \"Ӡ\",\n    \"қ\": \"қ\",\n    \"г\": \"г\",\n    \"Ч\": \"Ч\",\n    \"ф\": \"ф\",\n    \"Ї\": \"Ї\",\n    \"\\u0489\": \"\\u0489\",\n    \"Ѯ\": \"Ѯ\",\n    \"Ѻ\": \"Ѻ\",\n    \"ѿ\": \"ѿ\",\n    \"ҵ\": \"ҵ\",\n    \"ҳ\": \"ҳ\",\n    \"ў\": \"ў\",\n    \"ѩ\": \"ѩ\",\n    \"Я\": \"Я\",\n    \"љ\": \"љ\",\n    \"ө\": \"ө\",\n    \"Қ\": \"Қ\",\n    \"ъ\": \"ъ\",\n    \"ҏ\": \"ҏ\",\n    \"ҁ\": \"ҁ\",\n    \"Ђ\": \"Ђ\",\n    \"ѭ\": \"ѭ\",\n    \"\\u0488\": \"\\u0488\",\n    \"Ӏ\": \"Ӏ\",\n    \"Ҝ\": \"Ҝ\",\n    \"ѻ\": \"ѻ\",\n    \"ь\": \"ь\",\n    \"ҿ\": \"ҿ\",\n    \"җ\": \"җ\",\n    \"э\": \"э\",\n    \"Ѧ\": \"Ѧ\",\n    \"Ҡ\": \"Ҡ\",\n    \"ы\": \"ы\",\n    \"Э\": \"Э\",\n    \"ӈ\": \"ӈ\",\n    \"ҫ\": \"ҫ\",\n    \"ч\": \"ч\",\n    \"ћ\": \"ћ\",\n    \"Ҧ\": \"Ҧ\",\n    \"Ё\": \"Ё\",\n    \"Ю\": \"Ю\",\n    \"Ѹ\": \"Ѹ\",\n    \"ќ\": \"ќ\",\n    \"ѓ\": \"ѓ\",\n    \"Ќ\": \"Ќ\",\n    \"Ѓ\": \"Ѓ\"\n};\nexports.isCyrillicCharacter = function (x) {\n    return exports.cyrillicCharacters.hasOwnProperty(x);\n};\nexports.translateCharToCyrillic = function (char) {\n    if (exports.isCyrillicCharacter(char))\n        return exports.cyrillicCharacters[char];\n    else\n        return undefined;\n};\n//# sourceMappingURL=cyrillic.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/letters/cyrillic.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/symbols/dingbats.js":
+/*!********************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/symbols/dingbats.js ***!
+  \********************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.dingbatsUnicodeChart = {\n    \"33\": \"✁\",\n    \"34\": \"✂\",\n    \"35\": \"✃\",\n    \"36\": \"✄\",\n    \"37\": \"☎\",\n    \"38\": \"✆\",\n    \"39\": \"✇\",\n    \"40\": \"✈\",\n    \"41\": \"✉\",\n    \"42\": \"☛\",\n    \"43\": \"☞\",\n    \"44\": \"✌\",\n    \"45\": \"✍\",\n    \"46\": \"✎\",\n    \"47\": \"✏\",\n    \"48\": \"✐\",\n    \"49\": \"✑\",\n    \"50\": \"✒\",\n    \"51\": \"✓\",\n    \"52\": \"✔\",\n    \"53\": \"✕\",\n    \"54\": \"✖\",\n    \"55\": \"✗\",\n    \"56\": \"✘\",\n    \"57\": \"✙\",\n    \"58\": \"✚\",\n    \"59\": \"✛\",\n    \"60\": \"✜\",\n    \"61\": \"✝\",\n    \"62\": \"✞\",\n    \"63\": \"✟\",\n    \"64\": \"✠\",\n    \"65\": \"✡\",\n    \"66\": \"✢\",\n    \"67\": \"✣\",\n    \"68\": \"✤\",\n    \"69\": \"✥\",\n    \"70\": \"✦\",\n    \"71\": \"✧\",\n    \"72\": \"★\",\n    \"73\": \"✩\",\n    \"74\": \"✪\",\n    \"75\": \"✫\",\n    \"76\": \"✬\",\n    \"77\": \"✭\",\n    \"78\": \"✮\",\n    \"79\": \"✯\",\n    \"80\": \"✰\",\n    \"81\": \"✱\",\n    \"82\": \"✲\",\n    \"83\": \"✳\",\n    \"84\": \"✴\",\n    \"85\": \"✵\",\n    \"86\": \"✶\",\n    \"87\": \"✷\",\n    \"88\": \"✸\",\n    \"89\": \"✹\",\n    \"90\": \"✺\",\n    \"91\": \"✻\",\n    \"92\": \"✼\",\n    \"93\": \"✽\",\n    \"94\": \"✾\",\n    \"95\": \"✿\",\n    \"96\": \"❀\",\n    \"97\": \"❁\",\n    \"98\": \"❂\",\n    \"99\": \"❃\",\n    \"100\": \"❄\",\n    \"101\": \"❅\",\n    \"102\": \"❆\",\n    \"103\": \"❇\",\n    \"104\": \"❈\",\n    \"105\": \"❉\",\n    \"106\": \"❊\",\n    \"107\": \"❋\",\n    \"108\": \"●\",\n    \"109\": \"❍\",\n    \"110\": \"■\",\n    \"111\": \"❏\",\n    \"112\": \"❐\",\n    \"113\": \"❑\",\n    \"114\": \"❒\",\n    \"115\": \"▲\",\n    \"116\": \"▼\",\n    \"117\": \"◆\",\n    \"118\": \"❖\",\n    \"119\": \"◗\",\n    \"120\": \"❘\",\n    \"121\": \"❙\",\n    \"122\": \"❚\",\n    \"123\": \"❛\",\n    \"124\": \"❜\",\n    \"125\": \"❝\",\n    \"126\": \"❞\",\n    \"161\": \"❡\",\n    \"162\": \"❢\",\n    \"163\": \"❣\",\n    \"164\": \"❤\",\n    \"165\": \"❥\",\n    \"166\": \"❦\",\n    \"167\": \"❧\",\n    \"168\": \"♣\",\n    \"169\": \"♦\",\n    \"170\": \"♥\",\n    \"171\": \"♠\",\n    \"172\": \"①\",\n    \"173\": \"②\",\n    \"174\": \"③\",\n    \"175\": \"④\",\n    \"176\": \"⑤\",\n    \"177\": \"⑥\",\n    \"178\": \"⑦\",\n    \"179\": \"⑧\",\n    \"180\": \"⑨\",\n    \"181\": \"⑩\",\n    \"182\": \"❶\",\n    \"183\": \"❷\",\n    \"184\": \"❸\",\n    \"185\": \"❹\",\n    \"186\": \"❺\",\n    \"187\": \"❻\",\n    \"188\": \"❼\",\n    \"189\": \"❽\",\n    \"190\": \"❾\",\n    \"191\": \"❿\",\n    \"192\": \"➀\",\n    \"193\": \"➁\",\n    \"194\": \"➂\",\n    \"195\": \"➃\",\n    \"196\": \"➄\",\n    \"197\": \"➅\",\n    \"198\": \"➆\",\n    \"199\": \"➇\",\n    \"200\": \"➈\",\n    \"201\": \"➉\",\n    \"202\": \"➊\",\n    \"203\": \"➋\",\n    \"204\": \"➌\",\n    \"205\": \"➍\",\n    \"206\": \"➎\",\n    \"207\": \"➏\",\n    \"208\": \"➐\",\n    \"209\": \"➑\",\n    \"210\": \"➒\",\n    \"211\": \"➓\",\n    \"212\": \"➔\",\n    \"213\": \"→\",\n    \"214\": \"↔\",\n    \"215\": \"↕\",\n    \"216\": \"➘\",\n    \"217\": \"➙\",\n    \"218\": \"➚\",\n    \"219\": \"➛\",\n    \"220\": \"➜\",\n    \"221\": \"➝\",\n    \"222\": \"➞\",\n    \"223\": \"➟\",\n    \"224\": \"➠\",\n    \"225\": \"➡\",\n    \"226\": \"➢\",\n    \"227\": \"➣\",\n    \"228\": \"➤\",\n    \"229\": \"➥\",\n    \"230\": \"➦\",\n    \"231\": \"➧\",\n    \"232\": \"➨\",\n    \"233\": \"➩\",\n    \"234\": \"➪\",\n    \"235\": \"➫\",\n    \"236\": \"➬\",\n    \"237\": \"➭\",\n    \"238\": \"➮\",\n    \"239\": \"➯\",\n    \"241\": \"➱\",\n    \"242\": \"➲\",\n    \"243\": \"➳\",\n    \"244\": \"➴\",\n    \"245\": \"➵\",\n    \"246\": \"➶\",\n    \"247\": \"➷\",\n    \"248\": \"➸\",\n    \"249\": \"➹\",\n    \"250\": \"➺\",\n    \"251\": \"➻\",\n    \"252\": \"➼\",\n    \"253\": \"➽\",\n    \"254\": \"➾\"\n};\nfunction isDingbatCharacter(x) {\n    return exports.dingbatsUnicodeChart.hasOwnProperty(x);\n}\nexports.isDingbatCharacter = isDingbatCharacter;\nexports.translateCharToDingbat = function (char) { return isDingbatCharacter(char) ? exports.dingbatsUnicodeChart[char] : undefined; };\n//# sourceMappingURL=dingbats.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/symbols/dingbats.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/symbols/elsevier.js":
+/*!********************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/symbols/elsevier.js ***!
+  \********************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.elsevierGlyphsUnicodeChart = {\n    \"2129\": \"℩\",\n    \"21B3\": \"↳\",\n    \"2232\": \"∲\",\n    \"2233\": \"∳\",\n    \"2238\": \"∸\",\n    \"2242\": \"≂\",\n    \"225A\": \"≚\",\n    \"225F\": \"≟\",\n    \"2274\": \"≴\",\n    \"2275\": \"≵\",\n    \"22C0\": \"⋀\",\n    \"22C1\": \"⋁\",\n    \"E838\": \"⌽\",\n    \"E381\": \"▱\",\n    \"E212\": \"⤅\",\n    \"E20C\": \"⤣\",\n    \"E20D\": \"⤤\",\n    \"E20B\": \"⤥\",\n    \"E20A\": \"⤦\",\n    \"E211\": \"⤧\",\n    \"E20E\": \"⤨\",\n    \"E20F\": \"⤩\",\n    \"E210\": \"⤪\",\n    \"E21C\": \"⤳\",\n    \"E21D\": \"⤳\",\n    \"E21A\": \"⤶\",\n    \"E219\": \"⤷\",\n    \"E214\": \"⥼\",\n    \"E215\": \"⥽\",\n    \"E291\": \"⦔\",\n    \"E260\": \"⦵\",\n    \"E61B\": \"⦶\",\n    \"E372\": \"⧜\",\n    \"E395\": \"⨐\",\n    \"E25A\": \"⨥\",\n    \"E25B\": \"⨪\",\n    \"E25C\": \"⨭\",\n    \"E25D\": \"⨮\",\n    \"E25E\": \"⨴\",\n    \"E25F\": \"⨵\",\n    \"E259\": \"⨼\",\n    \"E36E\": \"⩕\",\n    \"E30D\": \"⫫\",\n    \"300A\": \"《\",\n    \"300B\": \"》\",\n    \"3018\": \"〘\",\n    \"3019\": \"〙\",\n};\nfunction isElsevierGlyph(x) {\n    return exports.elsevierGlyphsUnicodeChart.hasOwnProperty(x);\n}\nexports.isElsevierGlyph = isElsevierGlyph;\nexports.translateCharToElsevier = function (char) { return isElsevierGlyph(char) ? exports.elsevierGlyphsUnicodeChart[char] : undefined; };\n//# sourceMappingURL=elsevier.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/symbols/elsevier.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/symbols/runes.js":
+/*!*****************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/symbols/runes.js ***!
+  \*****************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.runesMap = {\n    \"ra\": {\n        \"\\\\ae\": \"ᚨ\",\n        \"\\\\c\": {\n            unicode: \"ᚳ\",\n            note: \"approximation\",\n        },\n        \"\\\\d\": {\n            unicode: \"ᛞ\",\n            note: \"approximation\",\n        },\n        \"\\\\ea\": \"ᛠ\",\n        \"\\\\G\": \"ᚸ\",\n        \"\\\\g\": {\n            unicode: \"ᚸ\",\n            note: \"approximation\",\n        },\n        \"\\\\h\": \"ᚬ\",\n        \"\\\\j\": \"ᛄ\",\n        \"\\\\k\": \"ᛤ\",\n        \"\\\\ng\": \"ᛝ\",\n        \"\\\\OE\": {\n            unicode: \"ᛟ\",\n            note: \"approximation\",\n        },\n        \"\\\\oe\": \"ᛟ\",\n        \"\\\\rex\": {\n            unicode: \"𐎟\",\n            note: \"approximation\",\n        },\n        \"\\\\seight\": {\n            unicode: \"⦚\",\n            note: \"approximation\",\n        },\n        \"\\\\sfive\": {\n            unicode: \"⦚\",\n            note: \"approximation\",\n        },\n        \"\\\\sfour\": {\n            unicode: \"⦚\",\n            note: \"approximation\",\n        },\n        \"\\\\sseven\": {\n            unicode: \"⦚\",\n            note: \"approximation\",\n        },\n        \"\\\\ssix\": {\n            unicode: \"⦚\",\n            note: \"approximation\",\n        },\n        \"\\\\stan\": {\n            unicode: \"ᛥ\",\n            note: \"approximation\",\n        },\n        \"\\\\STAN\": \"ᛥ\",\n        \"\\\\sthree\": \"ᛊ\",\n        \"\\\\th\": \"ᚦ\",\n        \"\\\\y\": {\n            unicode: \"ᚤ\",\n            note: \"approximation\",\n        },\n        \"a\": \"ᚪ\",\n        \"B\": {\n            unicode: \"ᛒ\",\n            note: \"approximation\",\n        },\n        \"b\": \"ᛒ\",\n        \"c\": \"ᚳ\",\n        \"D\": {\n            unicode: \"ᛞ\",\n            note: \"approximation\",\n        },\n        \"d\": \"ᛞ\",\n        \"e\": \"ᛖ\",\n        \"F\": {\n            unicode: \"ᚠ\",\n            note: \"approximation\",\n        },\n        \"f\": \"ᚠ\",\n        \"g\": \"ᚷ\",\n        \"H\": {\n            unicode: \"ᚺ\",\n            note: \"approximation\",\n        },\n        \"h\": \"ᚻ\",\n        \"i\": \"ᛁ\",\n        \"I\": {\n            unicode: \"ᛇ\",\n            \"latex2\": \"\\\\\\\"i\"\n        },\n        \"\\\\\\\"i\": \"ᛇ\",\n        \"J\": {\n            unicode: \"+\",\n            note: \"approximation\",\n        },\n        \"j\": \"ᚼ\",\n        \"k\": \"ᚲ\",\n        \"l\": \"ᛚ\",\n        \"m\": \"ᛗ\",\n        \"n\": \"ᚾ\",\n        \"o\": \"ᚩ\",\n        \"P\": {\n            unicode: \"⥏\",\n            note: \"approximation\",\n        },\n        \"p\": \"ᛈ\",\n        \"q\": \"ᛢ\",\n        \"r\": \"ᚱ\",\n        \"S\": {\n            unicode: \"⦚\",\n            note: \"approximation\",\n        },\n        \"s\": \"ᛋ\",\n        \"t\": \"ᛏ\",\n        \"U\": {\n            unicode: \"Λ\",\n            note: \"approximation\",\n        },\n        \"u\": \"ᚢ\",\n        \"w\": \"ᚹ\",\n        \"x\": \"ᛉ\",\n        \"Y\": {\n            unicode: \"ᚥ\",\n            note: \"approximation\",\n        },\n        \"y\": {\n            unicode: \"ᚣ\",\n            note: \"approximation\",\n        }\n    },\n    \"rc\": {\n        \"\\\\A\": \"ᚼ\",\n        \"\\\\a\": {\n            unicode: \"┝\",\n            note: \"approximation\",\n        },\n        \"\\\\d\": {\n            unicode: \"⋈\",\n            note: \"approximation\",\n        },\n        \"\\\\h\": \"ᚻ\",\n        \"\\\\i\": {\n            unicode: \"⥍\",\n            note: \"approximation\",\n        },\n        \"\\\\ing\": {\n            unicode: \"ᛄ\",\n            note: \"approximation\",\n        },\n        \"\\\\Ing\": {\n            unicode: \"ᛄ\",\n            note: \"approximation\",\n        },\n        \"\\\\ING\": \"ᛄ\",\n        \"\\\\j\": {\n            unicode: \"ᛃ\",\n            note: \"approximation\",\n        },\n        \"\\\\k\": {\n            unicode: \"⌵\",\n            note: \"approximation\",\n        },\n        \"\\\\K\": {\n            unicode: \"Υ\",\n            note: \"approximation\",\n        },\n        \"\\\\ng\": \"ᛜ\",\n        \"\\\\NG\": {\n            unicode: \"⸋\",\n            note: \"approximation\",\n        },\n        \"\\\\p\": {\n            unicode: \"ᛒ\", note: \"but with dot in lower\"\n        },\n        \"\\\\R\": \"ᛦ\",\n        \"\\\\RR\": {\n            unicode: \"ᛯ\",\n            note: \"approximation\",\n        },\n        \"\\\\s\": \"ᛋ\",\n        \"\\\\S\": \"ᛋ\",\n        \"\\\\seight\": {\n            unicode: \"⦚\",\n            note: \"approximation\",\n        },\n        \"\\\\sfive\": {\n            unicode: \"⦚\",\n            note: \"approximation\",\n        },\n        \"\\\\sseven\": {\n            unicode: \"⦚\",\n            note: \"approximation\",\n        },\n        \"\\\\sthree\": {\n            unicode: \"⦚\",\n            note: \"approximation\",\n        },\n        \"\\\\th\": \"ᚦ\",\n        \"a\": \"ᚨ\",\n        \"A\": \"ᛋ\",\n        \"b\": \"ᛒ\",\n        \"B\": {\n            unicode: \"ᛒ\",\n            note: \"approximation\",\n        },\n        \"d\": \"ᛞ\",\n        \"D\": {\n            unicode: \"▯\",\n            note: \"approximation\",\n        },\n        \"e\": \"ᛖ\",\n        \"E\": {\n            unicode: \"⨅\",\n            note: \"approximation\",\n        },\n        \"f\": {\n            unicode: \"ᚠ\",\n            note: \"but skinny\"\n        },\n        \"F\": \"ᚠ\",\n        \"g\": \"ᚷ\",\n        \"h\": \"ᚺ\",\n        \"H\": {\n            unicode: \"𝖭\",\n            note: \"approximation\",\n        },\n        \"i\": \"ᛁ\",\n        \"I\": {\n            unicode: \"⥌\",\n            note: \"approximation\",\n        }, \"\\\\\\\"i\": {\n            unicode: \"⥌\",\n            note: \"approximation\",\n        },\n        \"j\": \"ᛃ\",\n        \"J\": {\n            unicode: \"ϟ\",\n            note: \"but with box\"\n        },\n        \"k\": \"ᚲ\",\n        \"K\": {\n            unicode: \"Ⴤ\",\n            note: \"approximation\",\n        },\n        \"l\": \"ᛚ\",\n        \"m\": \"ᛗ\",\n        \"n\": \"ᚾ\",\n        \"o\": \"ᛟ\",\n        \"p\": \"ᛈ\",\n        \"P\": {\n            unicode: \"P\",\n            note: \"approximation\",\n        },\n        \"r\": \"ᚱ\",\n        \"R\": \"ᛉ\",\n        \"s\": \"ᛊ\",\n        \"\\\\sfour\": \"ᛊ\",\n        \"S\": {\n            unicode: \"⦚\",\n            note: \"approximation\",\n        },\n        \"t\": \"ᛏ\",\n        \"T\": {\n            unicode: \"ᛏ\",\n            note: \"approximation\",\n        },\n        \"u\": \"ᚢ\",\n        \"U\": {\n            unicode: \"Λ\",\n            note: \"approximation\",\n        },\n        \"w\": \"ᚹ\"\n    },\n    \"rm\": {\n        \"\\\\a\": \"ᛆ\", \".a\": \"ᛆ\",\n        \"\\\\adot\": {\n            note: \"ᛂ+ᛅ\",\n        }, \"'a\": {\n            note: \"ᛂ+ᛅ\",\n        },\n        \"\\\\c\": \"ᛍ\", \".c\": \"ᛍ\",\n        \"\\\\D\": {\n            note: \"Arrow with two dots\",\n        }, \"T\": {\n            note: \"Arrow with two dots\",\n        },\n        \"\\\\e\": {\n            unicode: \"⟊\",\n            note: \"approximation\",\n        }, \"=i\": {\n            unicode: \"⟊\",\n            note: \"approximation\",\n        },\n        \"\\\\g\": {\n            unicode: \"?\",\n            note: \"approximation\",\n        }, \"=k\": {\n            unicode: \"?\",\n            note: \"approximation\",\n        },\n        \"\\\\h\": {\n            unicode: \"⚹\",\n            note: \"approximation\",\n        },\n        \"\\\\l\": \"ᛛ\", \".l\": \"ᛛ\",\n        \"\\\\lbar\": {\n            note: \"ᛚ with bar\",\n        }, \"=l\": {\n            note: \"ᛚ with bar\",\n        },\n        \"\\\\ldot\": {\n            note: \"ᛚ with dot\",\n        }, \"'l\": {\n            note: \"ᛚ with dot\",\n        },\n        \"\\\\lflag\": {\n            note: \"ᛚ with flag\",\n        }, \"~l\": {\n            note: \"ᛚ with flag\",\n        },\n        \"\\\\lring\": {\n            note: \"ᛚ with ring\",\n        }, \"^l\": {\n            note: \"ᛚ with ring\",\n        },\n        \"\\\\m\": {\n            unicode: \"ᚴ\",\n            note: \"but mirrored\"\n        },\n        \"\\\\n\": {\n            unicode: \"ᛀ\",\n            note: \"approximation\",\n        }, \".n\": {\n            unicode: \"ᛀ\",\n            note: \"approximation\",\n        },\n        \"\\\\N\": \"ᛀ\", \".N\": \"ᛀ\",\n        \"\\\\ndot\": {\n            note: \"ᚿ+ᛀ\",\n        }, \"'n\": {\n            note: \"ᚿ+ᛀ\",\n        },\n        \"\\\\p\": {\n            unicode: \"ᛒ\",\n            note: \"but with dot in lower\"\n        }, \".b\": {\n            unicode: \"ᛒ\",\n            note: \"but with dot in lower\"\n        },\n        \"\\\\P\": \"ᛕ\",\n        \"\\\\Pdots\": {\n            note: \"ᛕ with dots\",\n        },\n        \"\\\\q\": {\n            note: \"ᚴ mirrored\",\n        },\n        \"\\\\Q\": {\n            note: \"ᛕ mirrored\",\n        },\n        \"\\\\r\": {\n            unicode: \"?\",\n            note: \"approximation\",\n        },\n        \"\\\\rdot\": {\n            note: \"ᚱ with dot\",\n        }, \".r\": {\n            note: \"ᚱ with dot\",\n        },\n        \"\\\\tbar\": {\n            unicode: \"ᛑ\",\n            note: \"but with bar\"\n        }, \"=t\": {\n            unicode: \"ᛑ\",\n            note: \"but with bar\"\n        },\n        \"\\\\tdot\": {\n            unicode: \"ᛑ\",\n            note: \"but dot translated upper left\"\n        }, \"'t\": {\n            unicode: \"ᛑ\",\n            note: \"but dot translated upper left\"\n        },\n        \"\\\\tflag\": {\n            unicode: \"ᛑ\",\n            note: \"but with flag\"\n        }, \"~t\": {\n            unicode: \"ᛑ\",\n            note: \"but with flag\"\n        },\n        \"\\\\tring\": {\n            unicode: \"ᛑ\",\n            note: \"but with ring\"\n        }, \"^t\": {\n            unicode: \"ᛑ\",\n            note: \"but with ring\"\n        },\n        \"a\": \"ᛆ\",\n        \"A\": {\n            unicode: \"ᛆ\",\n            note: \"but with bigger leg\"\n        },\n        \"b\": \"ᛒ\",\n        \"B\": {\n            unicode: \"ᛒ\",\n            note: \"but like b\"\n        },\n        \"c\": \"ᛌ\",\n        \"C\": {\n            unicode: \"ᛍ\",\n            note: \"approximation\",\n        }, \"^c\": {\n            unicode: \"ᛍ\",\n            note: \"approximation\",\n        },\n        \"d\": \"ᛑ\", \".t\": \"ᛑ\",\n        \"D\": {\n            note: \"ᛏ+ᛂ\",\n        }, \".T\": {\n            note: \"ᛏ+ᛂ\",\n        },\n        \"e\": \"ᛂ\", \".i\": \"ᛂ\",\n        \"E\": {\n            unicode: \"ᛂ\",\n            note: \"but with ring\"\n        }, \"^i\": {\n            unicode: \"ᛂ\",\n            note: \"but with ring\"\n        },\n        \"f\": \"ᚠ\",\n        \"F\": {\n            note: \"ᚠ with extra branch\",\n        },\n        \"g\": \"ᚵ\", \".k\": \"ᚵ\",\n        \"G\": {\n            unicode: \"ᚵ\",\n            note: \"but dot translated bottom left\"\n        }, \"'k\": {\n            unicode: \"ᚵ\",\n            note: \"but dot translated bottom left\"\n        },\n        \"h\": \"ᚼ\",\n        \"H\": {\n            unicode: \"✳\",\n            note: \"approximation\",\n        },\n        \"i\": \"ᛧ\",\n        \"k\": \"ᚴ\",\n        \"l\": \"ᛚ\",\n        \"m\": \"ᛘ\",\n        \"n\": \"ᚿ\",\n        \"N\": \"ᚾ\",\n        \"o\": \"ᚮ\",\n        \"p\": \"ᛔ\",\n        \"P\": \"ᚹ\",\n        \"q\": {\n            note: \"ᚹ mirrored\",\n        },\n        \"r\": \"ᚱ\"\n    },\n    \"rn\": {\n        \".i\": \"ᛂ\", \"e\": \"ᛂ\",\n        \".k\": \"ᚵ\", \"g\": \"ᚵ\",\n        \".u\": \"ᚤ\", \"y\": \"ᚤ\",\n        \"\\\\m\": {\n            note: \"ᛘ with dots\",\n        },\n        \"M\": {\n            note: \"⫯ with plus\",\n        }, \"\\\\M\": {\n            note: \"⫯ with plus\",\n        },\n        \"\\\\A\": \"ᚬ\",\n        \"\\\\bar\": {\n            unicode: \"❘\",\n            note: \"approximation\",\n        }, \"!\": {\n            unicode: \"❘\",\n            note: \"approximation\",\n        },\n        \"\\\\cross\": \"⨯\", \"*\": \"⨯\",\n        \"\\\\dot\": \"᛫\", \".\": \"᛫\",\n        \"\\\\doublebar\": \"¦\",\n        \"\\\\doublecross\": {\n            note: \"two stacked x's\",\n        },\n        \"\\\\doubledot\": \"᛬\", \":\": \"᛬\",\n        \"\\\\doubleeye\": \"᛬\",\n        \"\\\\doubleplus\": {\n            unicode: \"‡\",\n            note: \"approximation\",\n        },\n        \"\\\\eye\": \"᛫\",\n        \"\\\\pentdot\": {\n            unicode: \"⹘\",\n            note: \"proposal\",\n        },\n        \"\\\\penteye\": \"⸭\",\n        \"\\\\plus\": \"᛭\", \"+\": \"᛭\",\n        \"\\\\quaddot\": \"⁞\",\n        \"\\\\quadeye\": {\n            unicode: \"⁘\",\n            note: \"approximation\",\n        },\n        \"\\\\star\": {\n            unicode: \"*\",\n            note: \"approximation\",\n        },\n        \"\\\\th\": \"ᚦ\",\n        \"\\\\TH\": {\n            unicode: \"ᚦ\",\n            note: \"approximation\",\n        },\n        \"\\\\triplebar\": \"┆\",\n        \"\\\\triplecross\": {\n            note: \"three stacked x's\",\n        },\n        \"\\\\tripledot\": \"⁝\",\n        \"\\\\tripleeye\": \"⋮\",\n        \"\\\\tripleplus\": {\n            note: \"three stacked plusses\",\n        },\n        \"A\": \"ᚭ\",\n        \"a\": \"ᛅ\",\n        \"b\": \"ᛒ\",\n        \"B\": {\n            unicode: \"ᛒ\",\n            note: \"but skinny\"\n        },\n        \"f\": \"ᚠ\",\n        \"F\": {\n            unicode: \"ᚠ\",\n            note: \"but skinny\"\n        },\n        \"h\": \"ᚼ\",\n        \"i\": \"ᛁ\",\n        \"k\": \"ᚴ\",\n        \"l\": \"ᛚ\",\n        \"m\": \"ᛘ\",\n        \"n\": \"ᚾ\",\n        \"r\": \"ᚱ\",\n        \"R\": \"ᛣ\",\n        \"s\": \"ᛋ\",\n        \"S\": {\n            unicode: \"𝗁\",\n            note: \"but with sharp corner\",\n        },\n        \"t\": \"ᛏ\",\n        \"u\": {\n            \"latex1\": \"u\"\n        }\n    },\n    \"rt\": {},\n    \"rl\": {\n        \"\\\\A\": {\n            unicode: \"ߌ\",\n            note: \"approximation\"\n        },\n        \"\\\\th\": \"ᛧ\",\n        \"A\": {\n            unicode: \"`\",\n            note: \"approximation\"\n        },\n        \"a\": {\n            unicode: \"´\",\n            note: \"approximation\"\n        },\n        \"b\": {\n            unicode: \"´\",\n            note: \"approximation\"\n        },\n        \"f\": {\n            unicode: \"ߌ\",\n            note: \"approximation\"\n        },\n        \"h\": \"ᛙ\",\n        \"i\": \"ᛁ\",\n        \"k\": \"ᛍ\",\n        \"l\": {\n            unicode: \"`\",\n            note: \"approximation\"\n        },\n        \"m\": {\n            unicode: \":\",\n            note: \"approximation\"\n        },\n        \"n\": {\n            unicode: \"`\",\n            note: \"approximation\"\n        },\n        \"r\": {\n            unicode: \"⎧\",\n            note: \"approximation\"\n        },\n        \"R\": {\n            unicode: \":\",\n            note: \"approximation\"\n        },\n        \"s\": \"ᛧ\",\n        \"t\": {\n            unicode: \"´\",\n            note: \"approximation\"\n        },\n        \"u\": {\n            unicode: \"⎫\",\n            note: \"approximation\"\n        }\n    }\n};\nexports.isRuneType = function (x) { return exports.runesMap.hasOwnProperty(x); };\nexports.runeUnicode = function (type, innerLatex) {\n    var runesType = exports.runesMap[type];\n    if (!runesType)\n        return undefined;\n    var found = runesType[innerLatex];\n    if (typeof found === \"string\")\n        return found;\n    if (found.unicode)\n        return found.unicode;\n    return undefined;\n};\n//# sourceMappingURL=runes.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/symbols/runes.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/2args/binom.js":
+/*!*********************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/2args/binom.js ***!
+  \*********************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar util_1 = __webpack_require__(/*! ../../../util */ \"./node_modules/latex-to-unicode-converter/ts-compiled/util.js\");\nvar isSingleTerm = /^.$|^[0-9]+$/;\nfunction convertBinom(n, d) {\n    n = isSingleTerm.test(n) ? n : util_1.addParenthesis(n);\n    d = isSingleTerm.test(d) ? d : util_1.addParenthesis(d);\n    return \"(\" + n + \" \\u00A6 \" + d + \")\";\n}\nexports.convertBinom = convertBinom;\n//# sourceMappingURL=binom.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/2args/binom.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/2args/frac.js":
+/*!********************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/2args/frac.js ***!
+  \********************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar util_1 = __webpack_require__(/*! ../../../util */ \"./node_modules/latex-to-unicode-converter/ts-compiled/util.js\");\nvar zeroWidthNonJoiner = \"\\u200C\";\nvar regExpDigit = /^[0-9]*$/;\nfunction convertFracToUnicode(n, d) {\n    if (n === \"1\" && d === \"2\")\n        return \"½\";\n    if (n === \"1\" && d === \"3\")\n        return \"⅓\";\n    if (n === \"1\" && d === \"4\")\n        return \"¼\";\n    if (n === \"1\" && d === \"5\")\n        return \"⅕\";\n    if (n === \"1\" && d === \"6\")\n        return \"⅙\";\n    if (n === \"1\" && d === \"8\")\n        return \"⅛\";\n    if (n === \"2\" && d === \"3\")\n        return \"⅔\";\n    if (n === \"2\" && d === \"5\")\n        return \"⅖\";\n    if (n === \"3\" && d === \"4\")\n        return \"¾\";\n    if (n === \"3\" && d === \"5\")\n        return \"⅗\";\n    if (n === \"3\" && d === \"8\")\n        return \"⅜\";\n    if (n === \"4\" && d === \"5\")\n        return \"⅘\";\n    if (n === \"5\" && d === \"6\")\n        return \"⅚\";\n    if (n === \"5\" && d === \"8\")\n        return \"⅝\";\n    if (n === \"7\" && d === \"8\")\n        return \"⅞\";\n    if (regExpDigit.test(n) && regExpDigit.test(d)) {\n        return zeroWidthNonJoiner + n + \"⁄\" + d + zeroWidthNonJoiner;\n    }\n    n = util_1.isSingleTerm.test(n) ? n : util_1.addParenthesis(n);\n    d = util_1.isSingleTerm.test(d) ? d : util_1.addParenthesis(d);\n    return \"(\" + n + \" / \" + d + \")\";\n}\nexports.convertFracToUnicode = convertFracToUnicode;\n//# sourceMappingURL=frac.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/2args/frac.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/2args/index.js":
+/*!*********************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/2args/index.js ***!
+  \*********************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar frac_1 = __webpack_require__(/*! ./frac */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/2args/frac.js\");\nvar binom_1 = __webpack_require__(/*! ./binom */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/2args/binom.js\");\nfunction expand2argsCommand(name, arg1, arg2) {\n    switch (name) {\n        case \"frac\":\n        case \"nfrac\":\n        case \"cfrac\":\n        case \"xfrac\":\n        case \"sfrac\":\n            return frac_1.convertFracToUnicode(arg1, arg2);\n        case \"binom\":\n            return binom_1.convertBinom(arg1, arg2);\n    }\n    throw new Error(\"No implementation found to expand \\\\\" + name + \" with arguments {\" + arg1 + \", \" + arg2);\n}\nexports.expand2argsCommand = expand2argsCommand;\n//# sourceMappingURL=index.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/2args/index.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/command-expander.js":
+/*!**************************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/command-expander.js ***!
+  \**************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nfunction lookupOrAppend(conversionTable, _default_append) {\n    return function (string) {\n        if (conversionTable.hasOwnProperty(string))\n            return conversionTable[string];\n        if (!_default_append)\n            throw new Error(\"I do not know how to modify the following string: \"\n                + string +\n                \". \"\n                + \"Change your TeX file or submit a feature request at \"\n                + \"https://github.com/digitalheir/tex-to-unicode/issues.\");\n        return string + _default_append;\n    };\n}\nexports.lookupOrAppend = lookupOrAppend;\n//# sourceMappingURL=command-expander.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/command-expander.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/sqrt/sqrt.js":
+/*!*******************************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/sqrt/sqrt.js ***!
+  \*******************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar superscript_1 = __webpack_require__(/*! ../1args/formatting/superscript */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/formatting/superscript.js\");\nfunction determineSqrtSymbol(base) {\n    var trimmd = base ? base.trim() : undefined;\n    if (!trimmd)\n        return \"√\";\n    switch (trimmd) {\n        case \"2\":\n            return \"√\";\n        case \"3\":\n            return \"∛\";\n        case \"4\":\n            return \"∜\";\n        default:\n            var chars = [];\n            for (var i = 0; i < trimmd.length; i++) {\n                var char = superscript_1.translateCharToSuperscript(trimmd.charAt(i));\n                if (!char)\n                    throw new Error(\"Could not translate \\\"\" + char + \"\\\" to superscript\");\n                chars.push(char);\n            }\n            return chars.join(\"\") + \"√\";\n    }\n}\nfunction convertSqrtToUnicode(nucleus, base) {\n    var sqrt = determineSqrtSymbol(base);\n    var trimmedNucleus = nucleus.trim();\n    if (trimmedNucleus === \"\") {\n        return sqrt;\n    }\n    else {\n        return sqrt + \"(\" + trimmedNucleus + \")\";\n    }\n}\nexports.convertSqrtToUnicode = convertSqrtToUnicode;\n//# sourceMappingURL=sqrt.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/sqrt/sqrt.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unicode/convert.js":
+/*!********************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unicode/convert.js ***!
+  \********************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nvar latex_parser_1 = __webpack_require__(/*! latex-parser */ \"./node_modules/latex-parser/main.js\");\nvar unknown_command_1 = __webpack_require__(/*! ../unknown-command */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unknown-command.js\");\nvar index_1 = __webpack_require__(/*! ./commands/0args/index */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/0args/index.js\");\nvar KnownCommand_1 = __webpack_require__(/*! ../tex/KnownCommand */ \"./node_modules/latex-to-unicode-converter/ts-compiled/tex/KnownCommand.js\");\nvar index_2 = __webpack_require__(/*! ./commands/1args/index */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/1args/index.js\");\nvar index_3 = __webpack_require__(/*! ../latex/commands/1args/index */ \"./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/1args/index.js\");\nvar sqrt_1 = __webpack_require__(/*! ./commands/sqrt/sqrt */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/sqrt/sqrt.js\");\nvar index_4 = __webpack_require__(/*! ./commands/2args/index */ \"./node_modules/latex-to-unicode-converter/ts-compiled/unicode/commands/2args/index.js\");\nvar index_5 = __webpack_require__(/*! ../latex/commands/2args/index */ \"./node_modules/latex-to-unicode-converter/ts-compiled/latex/commands/2args/index.js\");\nvar CategoryCode_1 = __webpack_require__(/*! latex-parser/ts-compiled/Text/TeX/CategoryCode */ \"./node_modules/latex-parser/ts-compiled/Text/TeX/CategoryCode.js\");\nfunction isString(x) {\n    return typeof x === \"string\";\n}\nfunction convertChars(blockIndex, latex) {\n    var start = blockIndex;\n    do\n        blockIndex++;\n    while (latex_parser_1.isTeXChar(latex[blockIndex]));\n    var chars = latex.slice(start, blockIndex);\n    var result = chars.map(function (s) { return s.string; }).join(\"\");\n    return {\n        result: result,\n        blockIndex: blockIndex\n    };\n}\nvar regexStartingWhitespace = /^\\s*/;\nfunction convertTeXCommand(options, blockIndex, latex, current) {\n    var value = convertCommand(options, current);\n    if (isString(value)) {\n        return {\n            result: value,\n            blockIndex: blockIndex + 1\n        };\n    }\n    else {\n        var gobbledArguments = [];\n        var rest = [];\n        while (gobbledArguments.length < value.argumentCount && blockIndex < latex.length - 1) {\n            blockIndex++;\n            var nextWordToGobble = blockIndex;\n            if (latex.length < nextWordToGobble - 1)\n                throw new Error(\"Could not gobble \" + value.argumentCount + \" arguments for \" + current.name);\n            var nextLaTeXBlock = latex[nextWordToGobble];\n            if (latex_parser_1.isTeXRaw(nextLaTeXBlock)) {\n                var whitespaces = /\\s+/g;\n                var followingText = nextLaTeXBlock.text.replace(regexStartingWhitespace, \"\");\n                var restIndex = -1;\n                var lastIndex = 0;\n                while (gobbledArguments.length < value.argumentCount) {\n                    var argMatch = whitespaces.exec(followingText);\n                    if (argMatch) {\n                        var match = followingText.substring(lastIndex, argMatch.index);\n                        restIndex = argMatch.index;\n                        lastIndex = argMatch.index + match.length;\n                        gobbledArguments.push.apply(gobbledArguments, CategoryCode_1.convertToTeXCharsDefault(match));\n                    }\n                    else {\n                        gobbledArguments.push.apply(gobbledArguments, CategoryCode_1.convertToTeXCharsDefault(followingText));\n                        break;\n                    }\n                }\n                if (restIndex >= 0)\n                    rest.push((followingText.substring(restIndex)));\n            }\n            else\n                gobbledArguments.push(nextLaTeXBlock);\n        }\n        blockIndex++;\n        var argumentsToApply = gobbledArguments\n            .map(function (lll) { return convertLaTeXBlocksToUnicode(options, [lll]).result; })\n            .map(latex_parser_1.newTeXRaw)\n            .map(function (latex) { return latex_parser_1.newFixArg([latex]); });\n        if (argumentsToApply.length < value.argumentCount)\n            throw new Error(\"Could not find enough arguments for command \\\\\" + value.name + \". Expected \" + value.argumentCount + \", but found \" + argumentsToApply.length);\n        if (!value.apply)\n            throw new Error(\"Can't apply \" + JSON.stringify(value));\n        var result = [\n            value.apply(function () {\n            }, argumentsToApply)\n        ];\n        if (rest.length > 0)\n            result.push(rest.join(\"\"));\n        return {\n            result: result.join(\"\"),\n            blockIndex: blockIndex\n        };\n    }\n}\nfunction isTeXChar2(x) {\n    return x !== undefined\n        && typeof x.string === \"string\"\n        && typeof x.category === \"number\";\n}\nexports.isTeXChar2 = isTeXChar2;\nfunction convertLaTeXBlocksToUnicode(options, latex) {\n    var blockIndex = 0;\n    if (latex.length <= 0)\n        return {\n            result: \"\",\n            blockIndex: blockIndex\n        };\n    var finalConversion = [];\n    while (blockIndex < latex.length) {\n        var l = latex[blockIndex];\n        try {\n            if (isTeXChar2(l)) {\n                var convertedChars = convertChars(blockIndex, latex);\n                blockIndex = convertedChars.blockIndex;\n                finalConversion.push(convertedChars.result);\n            }\n            else if (latex_parser_1.isTeXComm(l)) {\n                var res = convertTeXCommand(options, blockIndex, latex, l);\n                blockIndex = res.blockIndex;\n                finalConversion.push(res.result);\n            }\n            else if (latex_parser_1.isFixArg(l) || latex_parser_1.isOptArg(l)) {\n                var res = convertLaTeXBlocksToUnicode(options, l.latex);\n                finalConversion.push(res.result);\n                blockIndex++;\n            }\n            else if (latex_parser_1.isTextHaving(l)) {\n                finalConversion.push(l.text);\n                blockIndex++;\n            }\n            else if (latex_parser_1.isTeXMath(l)) {\n                return convertLaTeXBlocksToUnicode(options, l.latex);\n            }\n            else if (latex_parser_1.isTeXRaw(l)) {\n                finalConversion.push(l.text);\n                blockIndex++;\n            }\n            else if (latex_parser_1.isSubOrSuperScript(l)) {\n                var args = l.arguments ? l.arguments : [];\n                var res = convertTeXCommand(options, blockIndex, latex, latex_parser_1.newTeXComm.apply(void 0, [l.type === latex_parser_1.SubOrSuperSymbol.SUB ? \"mathsubscript\" : \"mathsuperscript\"].concat(args)));\n                blockIndex = res.blockIndex;\n                finalConversion.push(res.result);\n            }\n            else if (latex_parser_1.isArray(l)) {\n                var res = convertLaTeXBlocksToUnicode(options, l);\n                finalConversion.push(res.result);\n                blockIndex++;\n            }\n            else {\n                throw new Error(\"Can't handle LaTeX block yet: \" + (JSON.stringify(l)) + \". Leave an issue at https://github.com/digitalheir/tex-to-unicode/issues\");\n            }\n        }\n        catch (e) {\n            if (options.onError !== undefined) {\n                var saved = options.onError(e, l);\n                if (saved !== undefined) {\n                    finalConversion.push(saved);\n                    blockIndex++;\n                }\n                else\n                    throw e;\n            }\n            else\n                throw e;\n        }\n    }\n    return {\n        result: finalConversion.join(\"\"),\n        blockIndex: blockIndex\n    };\n}\nexports.convertLaTeXBlocksToUnicode = convertLaTeXBlocksToUnicode;\nfunction convert1ArgCommand(options, cmd) {\n    if (cmd.arguments.length > 0) {\n        var expanded = index_2.expand1argsCommand(cmd.name, convertLaTeXBlocksToUnicode(options, [cmd.arguments[0]]).result || \"\");\n        if (cmd.arguments.length > 1)\n            return expanded + convertLaTeXBlocksToUnicode(options, cmd.arguments.slice(1)).result;\n        else\n            return expanded;\n    }\n    else\n        return KnownCommand_1.createCommandHandler(cmd.name, 0, 1, function (cb, texArgs) {\n            var firstArg = texArgs[0];\n            var rest = texArgs.slice(1);\n            var a = index_2.expand1argsCommand(cmd.name, convertLaTeXBlocksToUnicode(options, [firstArg]).result);\n            var b = convertLaTeXBlocksToUnicode(options, rest).result;\n            return a + b;\n        });\n}\nfunction convert2ArgCommand(options, cmd) {\n    if (cmd.arguments.length > 1) {\n        var expanded = index_4.expand2argsCommand(cmd.name, convertLaTeXBlocksToUnicode(options, [cmd.arguments[0]]).result || \"\", convertLaTeXBlocksToUnicode(options, [cmd.arguments[1]]).result || \"\");\n        if (cmd.arguments.length > 2)\n            return expanded + convertLaTeXBlocksToUnicode(options, cmd.arguments.slice(1)).result;\n        else\n            return expanded;\n    }\n    else\n        return KnownCommand_1.createCommandHandler(cmd.name, 0, 2, function (cb, texArgs) {\n            var firstArg = texArgs[0];\n            var secondArg = texArgs[1];\n            var rest = texArgs.slice(2);\n            var a = index_4.expand2argsCommand(cmd.name, convertLaTeXBlocksToUnicode(options, [firstArg]).result, convertLaTeXBlocksToUnicode(options, [secondArg]).result);\n            var b = convertLaTeXBlocksToUnicode(options, rest).result;\n            return a + b;\n        });\n}\nfunction convertSqrt(options, cmd) {\n    var base = undefined;\n    var nucleus = undefined;\n    var argIndex = 0;\n    while (nucleus === undefined && argIndex < cmd.arguments.length) {\n        var arg = cmd.arguments[argIndex];\n        var argAsString = convertLaTeXBlocksToUnicode(options, [arg]).result;\n        if (latex_parser_1.isOptArg(arg) && !base) {\n            base = argAsString;\n        }\n        else {\n            nucleus = argAsString;\n        }\n        argIndex++;\n    }\n    if (nucleus)\n        return sqrt_1.convertSqrtToUnicode(nucleus, base);\n    else\n        return KnownCommand_1.createCommandHandler(cmd.name, 1, 1, function (cb, texArgs) {\n            var firstArg = texArgs[0];\n            var a = sqrt_1.convertSqrtToUnicode(convertLaTeXBlocksToUnicode(options, [firstArg]).result);\n            if (texArgs.length > 1) {\n                var rest = texArgs.slice(1);\n                var b = convertLaTeXBlocksToUnicode(options, rest).result;\n                return a + b;\n            }\n            return a;\n        });\n}\nfunction convertCommand(options, cmd) {\n    var commandName = cmd.name;\n    var expanded0args = index_1.expand0argsCommand(commandName);\n    if (!!expanded0args)\n        if (cmd.arguments && cmd.arguments.length > 0)\n            return expanded0args + convertLaTeXBlocksToUnicode(options, cmd.arguments).result;\n        else\n            return expanded0args;\n    else if (index_3.is1argsCommand(commandName)) {\n        return convert1ArgCommand(options, cmd);\n    }\n    else if (index_5.is2argsCommand(commandName)) {\n        return convert2ArgCommand(options, cmd);\n    }\n    else if (commandName === \"sqrt\") {\n        return convertSqrt(options, cmd);\n    }\n    else {\n        throw unknown_command_1.unknownCommandError(commandName);\n    }\n}\nexports.convertCommand = convertCommand;\n//# sourceMappingURL=convert.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unicode/convert.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/unknown-command.js":
+/*!********************************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/unknown-command.js ***!
+  \********************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nfunction unknownCommandError(cmd) {\n    return new Error(\"I do not know command \" + cmd);\n}\nexports.unknownCommandError = unknownCommandError;\n//# sourceMappingURL=unknown-command.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/unknown-command.js?");
+
+/***/ }),
+
+/***/ "./node_modules/latex-to-unicode-converter/ts-compiled/util.js":
+/*!*********************************************************************!*\
+  !*** ./node_modules/latex-to-unicode-converter/ts-compiled/util.js ***!
+  \*********************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.simpleSuffix = function (modifier) {\n    return function (char) {\n        return char + modifier;\n    };\n};\nexports.isSingleTerm = /^.$|^[0-9]+$/;\nfunction addParenthesis(n) {\n    return \"(\" + n + \")\";\n}\nexports.addParenthesis = addParenthesis;\n//# sourceMappingURL=util.js.map\n\n//# sourceURL=webpack://bib2hugo/./node_modules/latex-to-unicode-converter/ts-compiled/util.js?");
+
+/***/ }),
+
+/***/ "./node_modules/parsimmon/src/parsimmon.js":
+/*!*************************************************!*\
+  !*** ./node_modules/parsimmon/src/parsimmon.js ***!
+  \*************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\n\nfunction Parsimmon(action) {\n  if (!(this instanceof Parsimmon)) {\n    return new Parsimmon(action);\n  }\n  this._ = action;\n}\n\nvar _ = Parsimmon.prototype;\n\n// -*- Helpers -*-\n\nfunction isParser(obj) {\n  return obj instanceof Parsimmon;\n}\n\nfunction isArray(x) {\n  return {}.toString.call(x) === '[object Array]';\n}\n\nfunction makeSuccess(index, value) {\n  return {\n    status: true,\n    index: index,\n    value: value,\n    furthest: -1,\n    expected: []\n  };\n}\n\nfunction makeFailure(index, expected) {\n  return {\n    status: false,\n    index: -1,\n    value: null,\n    furthest: index,\n    expected: [expected]\n  };\n}\n\nfunction mergeReplies(result, last) {\n  if (!last) {\n    return result;\n  }\n  if (result.furthest > last.furthest) {\n    return result;\n  }\n  var expected = (result.furthest === last.furthest)\n    ? unsafeUnion(result.expected, last.expected)\n    : last.expected;\n  return {\n    status: result.status,\n    index: result.index,\n    value: result.value,\n    furthest: last.furthest,\n    expected: expected\n  };\n}\n\nfunction makeLineColumnIndex(input, i) {\n  var lines = input.slice(0, i).split('\\n');\n  // Note that unlike the character offset, the line and column offsets are\n  // 1-based.\n  var lineWeAreUpTo = lines.length;\n  var columnWeAreUpTo = lines[lines.length - 1].length + 1;\n  return {\n    offset: i,\n    line: lineWeAreUpTo,\n    column: columnWeAreUpTo\n  };\n}\n\n// Returns the sorted set union of two arrays of strings. Note that if both\n// arrays are empty, it simply returns the first array, and if exactly one\n// array is empty, it returns the other one unsorted. This is safe because\n// expectation arrays always start as [] or [x], so as long as we merge with\n// this function, we know they stay in sorted order.\nfunction unsafeUnion(xs, ys) {\n  // Exit early if either array is empty (common case)\n  var xn = xs.length;\n  var yn = ys.length;\n  if (xn === 0) {\n    return ys;\n  } else if (yn === 0) {\n    return xs;\n  }\n  // Two non-empty arrays: do the full algorithm\n  var obj = {};\n  for (var i = 0; i < xn; i++) {\n    obj[xs[i]] = true;\n  }\n  for (var j = 0; j < yn; j++) {\n    obj[ys[j]] = true;\n  }\n  var keys = [];\n  for (var k in obj) {\n    if (obj.hasOwnProperty(k)) {\n      keys.push(k);\n    }\n  }\n  keys.sort();\n  return keys;\n}\n\nfunction assertParser(p) {\n  if (!isParser(p)) {\n    throw new Error('not a parser: ' + p);\n  }\n}\n\n// TODO[ES5]: Switch to Array.isArray eventually.\nfunction assertArray(x) {\n  if (!isArray(x)) {\n    throw new Error('not an array: ' + x);\n  }\n}\n\nfunction assertNumber(x) {\n  if (typeof x !== 'number') {\n    throw new Error('not a number: ' + x);\n  }\n}\n\nfunction assertRegexp(x) {\n  if (!(x instanceof RegExp)) {\n    throw new Error('not a regexp: '+x);\n  }\n  var f = flags(x);\n  for (var i = 0; i < f.length; i++) {\n    var c = f.charAt(i);\n    // Only allow regexp flags [imu] for now, since [g] and [y] specifically\n    // mess up Parsimmon. If more non-stateful regexp flags are added in the\n    // future, this will need to be revisited.\n    if (c !== 'i' && c !== 'm' && c !== 'u') {\n      throw new Error('unsupported regexp flag \"' + c + '\": ' + x);\n    }\n  }\n}\n\nfunction assertFunction(x) {\n  if (typeof x !== 'function') {\n    throw new Error('not a function: ' + x);\n  }\n}\n\nfunction assertString(x) {\n  if (typeof x !== 'string') {\n    throw new Error('not a string: ' + x);\n  }\n}\n\nfunction formatExpected(expected) {\n  if (expected.length === 1) {\n    return expected[0];\n  }\n  return 'one of ' + expected.join(', ');\n}\n\nfunction formatGot(input, error) {\n  var index = error.index;\n  var i = index.offset;\n  if (i === input.length) {\n    return ', got the end of the input';\n  }\n  var prefix = (i > 0 ? '\\'...' : '\\'');\n  var suffix = (input.length - i > 12 ? '...\\'' : '\\'');\n  return ' at line ' + index.line + ' column ' + index.column\n    +  ', got ' + prefix + input.slice(i, i + 12) + suffix;\n}\n\nfunction formatError(input, error) {\n  return 'expected ' +\n    formatExpected(error.expected) +\n    formatGot(input, error);\n}\n\nfunction flags(re) {\n  var s = '' + re;\n  return s.slice(s.lastIndexOf('/') + 1);\n}\n\nfunction anchoredRegexp(re) {\n  return RegExp('^(?:' + re.source + ')', flags(re));\n}\n\n// -*- Combinators -*-\n\nfunction seq() {\n  var parsers = [].slice.call(arguments);\n  var numParsers = parsers.length;\n  for (var j = 0; j < numParsers; j += 1) {\n    assertParser(parsers[j]);\n  }\n  return Parsimmon(function(input, i) {\n    var result;\n    var accum = new Array(numParsers);\n    for (var j = 0; j < numParsers; j += 1) {\n      result = mergeReplies(parsers[j]._(input, i), result);\n      if (!result.status) {\n        return result;\n      }\n      accum[j] = result.value;\n      i = result.index;\n    }\n    return mergeReplies(makeSuccess(i, accum), result);\n  });\n}\n\nfunction seqObj() {\n  var seenKeys = {};\n  var totalKeys = 0;\n  var parsers = [].slice.call(arguments);\n  var numParsers = parsers.length;\n  for (var j = 0; j < numParsers; j += 1) {\n    var p = parsers[j];\n    if (isParser(p)) {\n      continue;\n    }\n    if (isArray(p)) {\n      var isWellFormed =\n        p.length === 2 &&\n        typeof p[0] === 'string' &&\n        isParser(p[1]);\n      if (isWellFormed) {\n        var key = p[0];\n        if (seenKeys[key]) {\n          throw new Error('seqObj: duplicate key ' + key);\n        }\n        seenKeys[key] = true;\n        totalKeys++;\n        continue;\n      }\n    }\n    throw new Error(\n      'seqObj arguments must be parsers or ' +\n      '[string, parser] array pairs.'\n    );\n  }\n  if (totalKeys === 0) {\n    throw new Error('seqObj expects at least one named parser, found zero');\n  }\n  return Parsimmon(function(input, i) {\n    var result;\n    var accum = {};\n    for (var j = 0; j < numParsers; j += 1) {\n      var name;\n      var parser;\n      if (isArray(parsers[j])) {\n        name = parsers[j][0];\n        parser = parsers[j][1];\n      } else {\n        name = null;\n        parser = parsers[j];\n      }\n      result = mergeReplies(parser._(input, i), result);\n      if (!result.status) {\n        return result;\n      }\n      if (name) {\n        accum[name] = result.value;\n      }\n      i = result.index;\n    }\n    return mergeReplies(makeSuccess(i, accum), result);\n  });\n}\n\nfunction seqMap() {\n  var args = [].slice.call(arguments);\n  if (args.length === 0) {\n    throw new Error('seqMap needs at least one argument');\n  }\n  var mapper = args.pop();\n  assertFunction(mapper);\n  return seq.apply(null, args).map(function(results) {\n    return mapper.apply(null, results);\n  });\n}\n\n// TODO[ES5]: Revisit this with Object.keys and .bind.\nfunction createLanguage(parsers) {\n  var language = {};\n  for (var key in parsers) {\n    if ({}.hasOwnProperty.call(parsers, key)) {\n      (function(key) {\n        var func = function() {\n          return parsers[key](language);\n        };\n        language[key] = lazy(func);\n      }(key));\n    }\n  }\n  return language;\n}\n\nfunction alt() {\n  var parsers = [].slice.call(arguments);\n  var numParsers = parsers.length;\n  if (numParsers === 0) {\n    return fail('zero alternates');\n  }\n  for (var j = 0; j < numParsers; j += 1) {\n    assertParser(parsers[j]);\n  }\n  return Parsimmon(function(input, i) {\n    var result;\n    for (var j = 0; j < parsers.length; j += 1) {\n      result = mergeReplies(parsers[j]._(input, i), result);\n      if (result.status) {\n        return result;\n      }\n    }\n    return result;\n  });\n}\n\nfunction sepBy(parser, separator) {\n  // Argument asserted by sepBy1\n  return sepBy1(parser, separator).or(succeed([]));\n}\n\nfunction sepBy1(parser, separator) {\n  assertParser(parser);\n  assertParser(separator);\n  var pairs = separator.then(parser).many();\n  return parser.chain(function(r) {\n    return pairs.map(function(rs) {\n      return [r].concat(rs);\n    });\n  });\n}\n\n// -*- Core Parsing Methods -*-\n\n_.parse = function(input) {\n  if (typeof input !== 'string') {\n    throw new Error('.parse must be called with a string as its argument');\n  }\n  var result = this.skip(eof)._(input, 0);\n  if (result.status) {\n    return {\n      status: true,\n      value: result.value\n    };\n  }\n  return {\n    status: false,\n    index: makeLineColumnIndex(input, result.furthest),\n    expected: result.expected\n  };\n};\n\n// -*- Other Methods -*-\n\n_.tryParse = function(str) {\n  var result = this.parse(str);\n  if (result.status) {\n    return result.value;\n  } else {\n    var msg = formatError(str, result);\n    var err = new Error(msg);\n    err.type = 'ParsimmonError';\n    err.result = result;\n    throw err;\n  }\n};\n\n_.or = function(alternative) {\n  return alt(this, alternative);\n};\n\n_.trim = function(parser) {\n  return this.wrap(parser, parser);\n};\n\n_.wrap = function(leftParser, rightParser) {\n  return seqMap(\n    leftParser,\n    this,\n    rightParser,\n    function(left, middle) {\n      return middle;\n    }\n  );\n};\n\n_.thru = function(wrapper) {\n  return wrapper(this);\n};\n\n_.then = function(next) {\n  assertParser(next);\n  return seq(this, next).map(function(results) { return results[1]; });\n};\n\n_.many = function() {\n  var self = this;\n\n  return Parsimmon(function(input, i) {\n    var accum = [];\n    var result = undefined;\n\n    for (;;) {\n      result = mergeReplies(self._(input, i), result);\n      if (result.status) {\n        i = result.index;\n        accum.push(result.value);\n      } else {\n        return mergeReplies(makeSuccess(i, accum), result);\n      }\n    }\n  });\n};\n\n_.tie = function() {\n  return this.map(function(args) {\n    assertArray(args);\n    var s = '';\n    for (var i = 0; i < args.length; i++) {\n      assertString(args[i]);\n      s += args[i];\n    }\n    return s;\n  });\n};\n\n_.times = function(min, max) {\n  var self = this;\n  if (arguments.length < 2) {\n    max = min;\n  }\n  assertNumber(min);\n  assertNumber(max);\n  return Parsimmon(function(input, i) {\n    var accum = [];\n    var result = undefined;\n    var prevResult = undefined;\n    for (var times = 0; times < min; times += 1) {\n      result = self._(input, i);\n      prevResult = mergeReplies(result, prevResult);\n      if (result.status) {\n        i = result.index;\n        accum.push(result.value);\n      } else {\n        return prevResult;\n      }\n    }\n    for (; times < max; times += 1) {\n      result = self._(input, i);\n      prevResult = mergeReplies(result, prevResult);\n      if (result.status) {\n        i = result.index;\n        accum.push(result.value);\n      } else {\n        break;\n      }\n    }\n    return mergeReplies(makeSuccess(i, accum), prevResult);\n  });\n};\n\n_.result = function(res) {\n  return this.map(function() {\n    return res;\n  });\n};\n\n_.atMost = function(n) {\n  return this.times(0, n);\n};\n\n_.atLeast = function(n) {\n  return seqMap(this.times(n), this.many(), function(init, rest) {\n    return init.concat(rest);\n  });\n};\n\n_.map = function(fn) {\n  assertFunction(fn);\n  var self = this;\n  return Parsimmon(function(input, i) {\n    var result = self._(input, i);\n    if (!result.status) {\n      return result;\n    }\n    return mergeReplies(makeSuccess(result.index, fn(result.value)), result);\n  });\n};\n\n_.skip = function(next) {\n  return seq(this, next).map(function(results) { return results[0]; });\n};\n\n_.mark = function() {\n  return seqMap(index, this, index, function(start, value, end) {\n    return {\n      start: start,\n      value: value,\n      end: end\n    };\n  });\n};\n\n_.node = function(name) {\n  return seqMap(index, this, index, function(start, value, end) {\n    return {\n      name: name,\n      value: value,\n      start: start,\n      end: end\n    };\n  });\n};\n\n_.sepBy = function(separator) {\n  return sepBy(this, separator);\n};\n\n_.sepBy1 = function(separator) {\n  return sepBy1(this, separator);\n};\n\n_.lookahead = function(x) {\n  return this.skip(lookahead(x));\n};\n\n_.notFollowedBy = function(x) {\n  return this.skip(notFollowedBy(x));\n};\n\n_.desc = function(expected) {\n  var self = this;\n  return Parsimmon(function(input, i) {\n    var reply = self._(input, i);\n    if (!reply.status) {\n      reply.expected = [expected];\n    }\n    return reply;\n  });\n};\n\n_.fallback = function(result) {\n  return this.or(succeed(result));\n};\n\n_.ap = function(other) {\n  return seqMap(other, this, function(f, x) {\n    return f(x);\n  });\n};\n\n_.chain = function(f) {\n  var self = this;\n  return Parsimmon(function(input, i) {\n    var result = self._(input, i);\n    if (!result.status) {\n      return result;\n    }\n    var nextParser = f(result.value);\n    return mergeReplies(nextParser._(input, result.index), result);\n  });\n};\n\n// -*- Constructors -*-\n\nfunction string(str) {\n  assertString(str);\n  var expected = '\\'' + str + '\\'';\n  return Parsimmon(function(input, i) {\n    var j = i + str.length;\n    var head = input.slice(i, j);\n    if (head === str) {\n      return makeSuccess(j, head);\n    } else {\n      return makeFailure(i, expected);\n    }\n  });\n}\n\nfunction regexp(re, group) {\n  assertRegexp(re);\n  if (arguments.length >= 2) {\n    assertNumber(group);\n  } else {\n    group = 0;\n  }\n  var anchored = anchoredRegexp(re);\n  var expected = '' + re;\n  return Parsimmon(function(input, i) {\n    var match = anchored.exec(input.slice(i));\n    if (match) {\n      if (0 <= group && group <= match.length) {\n        var fullMatch = match[0];\n        var groupMatch = match[group];\n        return makeSuccess(i + fullMatch.length, groupMatch);\n      }\n      var message =\n        'valid match group (0 to ' + match.length + ') in ' + expected;\n      return makeFailure(i, message);\n    }\n    return makeFailure(i, expected);\n  });\n}\n\nfunction succeed(value) {\n  return Parsimmon(function(input, i) {\n    return makeSuccess(i, value);\n  });\n}\n\nfunction fail(expected) {\n  return Parsimmon(function(input, i) {\n    return makeFailure(i, expected);\n  });\n}\n\nfunction lookahead(x) {\n  if (isParser(x)) {\n    return Parsimmon(function(input, i) {\n      var result = x._(input, i);\n      result.index = i;\n      result.value = '';\n      return result;\n    });\n  } else if (typeof x === 'string') {\n    return lookahead(string(x));\n  } else if (x instanceof RegExp) {\n    return lookahead(regexp(x));\n  }\n  throw new Error('not a string, regexp, or parser: ' + x);\n}\n\nfunction notFollowedBy(parser) {\n  assertParser(parser);\n  return Parsimmon(function(input, i) {\n    var result = parser._(input, i);\n    var text = input.slice(i, result.index);\n    return result.status\n      ? makeFailure(i, 'not \"' + text + '\"')\n      : makeSuccess(i, null);\n  });\n}\n\nfunction test(predicate) {\n  assertFunction(predicate);\n  return Parsimmon(function(input, i) {\n    var char = input.charAt(i);\n    if (i < input.length && predicate(char)) {\n      return makeSuccess(i + 1, char);\n    } else {\n      return makeFailure(i, 'a character matching ' + predicate);\n    }\n  });\n}\n\nfunction oneOf(str) {\n  return test(function(ch) {\n    return str.indexOf(ch) >= 0;\n  });\n}\n\nfunction noneOf(str) {\n  return test(function(ch) {\n    return str.indexOf(ch) < 0;\n  });\n}\n\nfunction custom(parsingFunction) {\n  return Parsimmon(parsingFunction(makeSuccess, makeFailure));\n}\n\n// TODO[ES5]: Improve error message using JSON.stringify eventually.\nfunction range(begin, end) {\n  return test(function(ch) {\n    return begin <= ch && ch <= end;\n  }).desc(begin + '-' + end);\n}\n\nfunction takeWhile(predicate) {\n  assertFunction(predicate);\n\n  return Parsimmon(function(input, i) {\n    var j = i;\n    while (j < input.length && predicate(input.charAt(j))) {\n      j++;\n    }\n    return makeSuccess(j, input.slice(i, j));\n  });\n}\n\nfunction lazy(desc, f) {\n  if (arguments.length < 2) {\n    f = desc;\n    desc = undefined;\n  }\n\n  var parser = Parsimmon(function(input, i) {\n    parser._ = f()._;\n    return parser._(input, i);\n  });\n\n  if (desc) {\n    return parser.desc(desc);\n  } else {\n    return parser;\n  }\n}\n\n// -*- Fantasy Land Extras -*-\n\nfunction empty() {\n  return fail('fantasy-land/empty');\n}\n\n_.concat = _.or;\n_.empty = empty;\n_.of = succeed;\n_['fantasy-land/ap'] = _.ap;\n_['fantasy-land/chain'] = _.chain;\n_['fantasy-land/concat'] = _.concat;\n_['fantasy-land/empty'] = _.empty;\n_['fantasy-land/of'] = _.of;\n_['fantasy-land/map'] = _.map;\n\n// -*- Base Parsers -*-\n\nvar index = Parsimmon(function(input, i) {\n  return makeSuccess(i, makeLineColumnIndex(input, i));\n});\n\nvar any = Parsimmon(function(input, i) {\n  if (i >= input.length) {\n    return makeFailure(i, 'any character');\n  }\n  return makeSuccess(i + 1, input.charAt(i));\n});\n\nvar all = Parsimmon(function(input, i) {\n  return makeSuccess(input.length, input.slice(i));\n});\n\nvar eof = Parsimmon(function(input, i) {\n  if (i < input.length) {\n    return makeFailure(i, 'EOF');\n  }\n  return makeSuccess(i, null);\n});\n\nvar digit = regexp(/[0-9]/).desc('a digit');\nvar digits = regexp(/[0-9]*/).desc('optional digits');\nvar letter = regexp(/[a-z]/i).desc('a letter');\nvar letters = regexp(/[a-z]*/i).desc('optional letters');\nvar optWhitespace = regexp(/\\s*/).desc('optional whitespace');\nvar whitespace = regexp(/\\s+/).desc('whitespace');\n\nParsimmon.all = all;\nParsimmon.alt = alt;\nParsimmon.any = any;\nParsimmon.createLanguage = createLanguage;\nParsimmon.custom = custom;\nParsimmon.digit = digit;\nParsimmon.digits = digits;\nParsimmon.empty = empty;\nParsimmon.eof = eof;\nParsimmon.fail = fail;\nParsimmon.formatError = formatError;\nParsimmon.index = index;\nParsimmon.isParser = isParser;\nParsimmon.lazy = lazy;\nParsimmon.letter = letter;\nParsimmon.letters = letters;\nParsimmon.lookahead = lookahead;\nParsimmon.makeFailure = makeFailure;\nParsimmon.makeSuccess = makeSuccess;\nParsimmon.noneOf = noneOf;\nParsimmon.notFollowedBy = notFollowedBy;\nParsimmon.of = succeed;\nParsimmon.oneOf = oneOf;\nParsimmon.optWhitespace = optWhitespace;\nParsimmon.Parser = Parsimmon;\nParsimmon.range = range;\nParsimmon.regex = regexp;\nParsimmon.regexp = regexp;\nParsimmon.sepBy = sepBy;\nParsimmon.sepBy1 = sepBy1;\nParsimmon.seq = seq;\nParsimmon.seqMap = seqMap;\nParsimmon.seqObj = seqObj;\nParsimmon.string = string;\nParsimmon.succeed = succeed;\nParsimmon.takeWhile = takeWhile;\nParsimmon.test = test;\nParsimmon.whitespace = whitespace;\nParsimmon['fantasy-land/empty'] = empty;\nParsimmon['fantasy-land/of'] = succeed;\n\nmodule.exports = Parsimmon;\n\n\n//# sourceURL=webpack://bib2hugo/./node_modules/parsimmon/src/parsimmon.js?");
+
+/***/ }),
+
+/***/ "fs":
+/*!*********************!*\
+  !*** external "fs" ***!
+  \*********************/
+/*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = require("fs");
+eval("module.exports = require(\"fs\");\n\n//# sourceURL=webpack://bib2hugo/external_%22fs%22?");
 
 /***/ }),
-/* 16 */
+
+/***/ "path":
+/*!***********************!*\
+  !*** external "path" ***!
+  \***********************/
+/*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = require("path");
-
-/***/ }),
-/* 17 */
-/***/ (function(module, exports, __webpack_require__) {
-
-/* start bibtexParse 0.0.24 */
-
-//Original work by Henrik Muehe (c) 2010
-//
-//CommonJS port by Mikola Lysenko 2013
-//
-//Port to Browser lib by ORCID / RCPETERS
-//
-//Issues:
-//no comment handling within strings
-//no string concatenation
-//no variable values yet
-//Grammar implemented here:
-//bibtex -> (string | preamble | comment | entry)*;
-//string -> '@STRING' '{' key_equals_value '}';
-//preamble -> '@PREAMBLE' '{' value '}';
-//comment -> '@COMMENT' '{' value '}';
-//entry -> '@' key '{' key ',' key_value_list '}';
-//key_value_list -> key_equals_value (',' key_equals_value)*;
-//key_equals_value -> key '=' value;
-//value -> value_quotes | value_braces | key;
-//value_quotes -> '"' .*? '"'; // not quite
-//value_braces -> '{' .*? '"'; // not quite
-(function(exports) {
-
-    function BibtexParser() {
-
-        this.months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-        this.notKey = [',','{','}',' ','='];
-        this.pos = 0;
-        this.input = "";
-        this.entries = new Array();
-
-        this.currentEntry = "";
-
-        this.setInput = function(t) {
-            this.input = t;
-        };
-
-        this.getEntries = function() {
-            return this.entries;
-        };
-
-        this.isWhitespace = function(s) {
-            return (s == ' ' || s == '\r' || s == '\t' || s == '\n');
-        };
-
-        this.match = function(s, canCommentOut) {
-            if (canCommentOut == undefined || canCommentOut == null)
-                canCommentOut = true;
-            this.skipWhitespace(canCommentOut);
-            if (this.input.substring(this.pos, this.pos + s.length) == s) {
-                this.pos += s.length;
-            } else {
-                throw "Token mismatch, expected " + s + ", found "
-                        + this.input.substring(this.pos);
-            };
-            this.skipWhitespace(canCommentOut);
-        };
-
-        this.tryMatch = function(s, canCommentOut) {
-            if (canCommentOut == undefined || canCommentOut == null)
-                canCommentOut = true;
-            this.skipWhitespace(canCommentOut);
-            if (this.input.substring(this.pos, this.pos + s.length) == s) {
-                return true;
-            } else {
-                return false;
-            };
-            this.skipWhitespace(canCommentOut);
-        };
-
-        /* when search for a match all text can be ignored, not just white space */
-        this.matchAt = function() {
-            while (this.input.length > this.pos && this.input[this.pos] != '@') {
-                this.pos++;
-            };
-
-            if (this.input[this.pos] == '@') {
-                return true;
-            };
-            return false;
-        };
-
-        this.skipWhitespace = function(canCommentOut) {
-            while (this.isWhitespace(this.input[this.pos])) {
-                this.pos++;
-            };
-            if (this.input[this.pos] == "%" && canCommentOut == true) {
-                while (this.input[this.pos] != "\n") {
-                    this.pos++;
-                };
-                this.skipWhitespace(canCommentOut);
-            };
-        };
-
-        this.value_braces = function() {
-            var bracecount = 0;
-            this.match("{", false);
-            var start = this.pos;
-            var escaped = false;
-            while (true) {
-                if (!escaped) {
-                    if (this.input[this.pos] == '}') {
-                        if (bracecount > 0) {
-                            bracecount--;
-                        } else {
-                            var end = this.pos;
-                            this.match("}", false);
-                            return this.input.substring(start, end);
-                        };
-                    } else if (this.input[this.pos] == '{') {
-                        bracecount++;
-                    } else if (this.pos >= this.input.length - 1) {
-                        throw "Unterminated value";
-                    };
-                };
-                if (this.input[this.pos] == '\\' && escaped == false)
-                    escaped = true;
-                else
-                    escaped = false;
-                this.pos++;
-            };
-        };
-
-        this.value_comment = function() {
-            var str = '';
-            var brcktCnt = 0;
-            while (!(this.tryMatch("}", false) && brcktCnt == 0)) {
-                str = str + this.input[this.pos];
-                if (this.input[this.pos] == '{')
-                    brcktCnt++;
-                if (this.input[this.pos] == '}')
-                    brcktCnt--;
-                if (this.pos >= this.input.length - 1) {
-                    throw "Unterminated value:" + this.input.substring(start);
-                };
-                this.pos++;
-            };
-            return str;
-        };
-
-        this.value_quotes = function() {
-            this.match('"', false);
-            var start = this.pos;
-            var escaped = false;
-            while (true) {
-                if (!escaped) {
-                    if (this.input[this.pos] == '"') {
-                        var end = this.pos;
-                        this.match('"', false);
-                        return this.input.substring(start, end);
-                    } else if (this.pos >= this.input.length - 1) {
-                        throw "Unterminated value:" + this.input.substring(start);
-                    };
-                }
-                if (this.input[this.pos] == '\\' && escaped == false)
-                    escaped = true;
-                else
-                    escaped = false;
-                this.pos++;
-            };
-        };
-
-        this.single_value = function() {
-            var start = this.pos;
-            if (this.tryMatch("{")) {
-                return this.value_braces();
-            } else if (this.tryMatch('"')) {
-                return this.value_quotes();
-            } else {
-                var k = this.key();
-                if (k.match("^[0-9]+$"))
-                    return k;
-                else if (this.months.indexOf(k.toLowerCase()) >= 0)
-                    return k.toLowerCase();
-                else
-                    throw "Value expected:" + this.input.substring(start) + ' for key: ' + k;
-
-            };
-        };
-
-        this.value = function() {
-            var values = [];
-            values.push(this.single_value());
-            while (this.tryMatch("#")) {
-                this.match("#");
-                values.push(this.single_value());
-            };
-            return values.join("");
-        };
-
-        this.key = function(optional) {
-            var start = this.pos;
-            while (true) {
-                if (this.pos >= this.input.length) {
-                    throw "Runaway key";
-                };
-                                // а-яА-Я is Cyrillic
-                //console.log(this.input[this.pos]);
-                if (this.notKey.indexOf(this.input[this.pos]) >= 0) {
-                    if (optional && this.input[this.pos] != ',') {
-                        this.pos = start;
-                        return null;
-                    };
-                    return this.input.substring(start, this.pos);
-                } else {
-                    this.pos++;
-
-                };
-            };
-        };
-
-        this.key_equals_value = function() {
-            var key = this.key();
-            if (this.tryMatch("=")) {
-                this.match("=");
-                var val = this.value();
-                key = key.trim()
-                return [ key, val ];
-            } else {
-                throw "... = value expected, equals sign missing:"
-                        + this.input.substring(this.pos);
-            };
-        };
-
-        this.key_value_list = function() {
-            var kv = this.key_equals_value();
-            this.currentEntry['entryTags'] = {};
-            this.currentEntry['entryTags'][kv[0]] = kv[1];
-            while (this.tryMatch(",")) {
-                this.match(",");
-                // fixes problems with commas at the end of a list
-                if (this.tryMatch("}")) {
-                    break;
-                }
-                ;
-                kv = this.key_equals_value();
-                this.currentEntry['entryTags'][kv[0]] = kv[1];
-            };
-        };
-
-        this.entry_body = function(d) {
-            this.currentEntry = {};
-            this.currentEntry['citationKey'] = this.key(true);
-            this.currentEntry['entryType'] = d.substring(1);
-            if (this.currentEntry['citationKey'] != null) {
-                this.match(",");
-            }
-            this.key_value_list();
-            this.entries.push(this.currentEntry);
-        };
-
-        this.directive = function() {
-            this.match("@");
-            return "@" + this.key();
-        };
-
-        this.preamble = function() {
-            this.currentEntry = {};
-            this.currentEntry['entryType'] = 'PREAMBLE';
-            this.currentEntry['entry'] = this.value_comment();
-            this.entries.push(this.currentEntry);
-        };
-
-        this.comment = function() {
-            this.currentEntry = {};
-            this.currentEntry['entryType'] = 'COMMENT';
-            this.currentEntry['entry'] = this.value_comment();
-            this.entries.push(this.currentEntry);
-        };
-
-        this.entry = function(d) {
-            this.entry_body(d);
-        };
-
-        this.alernativeCitationKey = function () {
-            this.entries.forEach(function (entry) {
-                if (!entry.citationKey && entry.entryTags) {
-                    entry.citationKey = '';
-                    if (entry.entryTags.author) {
-                        entry.citationKey += entry.entryTags.author.split(',')[0] += ', ';
-                    }
-                    entry.citationKey += entry.entryTags.year;
-                }
-            });
-        }
-
-        this.bibtex = function() {
-            while (this.matchAt()) {
-                var d = this.directive();
-                this.match("{");
-                if (d.toUpperCase() == "@STRING") {
-                    this.string();
-                } else if (d.toUpperCase() == "@PREAMBLE") {
-                    this.preamble();
-                } else if (d.toUpperCase() == "@COMMENT") {
-                    this.comment();
-                } else {
-                    this.entry(d);
-                }
-                this.match("}");
-            };
-
-            this.alernativeCitationKey();
-        };
-    };
-
-    exports.toJSON = function(bibtex) {
-        var b = new BibtexParser();
-        b.setInput(bibtex);
-        b.bibtex();
-        return b.entries;
-    };
-
-    /* added during hackathon don't hate on me */
-    exports.toBibtex = function(json) {
-        var out = '';
-        for ( var i in json) {
-            out += "@" + json[i].entryType;
-            out += '{';
-            if (json[i].citationKey)
-                out += json[i].citationKey + ', ';
-            if (json[i].entry)
-                out += json[i].entry ;
-            if (json[i].entryTags) {
-                var tags = '';
-                for (var jdx in json[i].entryTags) {
-                    if (tags.length != 0)
-                        tags += ', ';
-                    tags += jdx + '= {' + json[i].entryTags[jdx] + '}';
-                }
-                out += tags;
-            }
-            out += '}\n\n';
-        }
-        return out;
-
-    };
-
-})( false ? this['bibtexParse'] = {} : exports);
-
-/* end bibtexParse */
-
-
-/***/ }),
-/* 18 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", { value: true });
-__export(__webpack_require__(19));
-__export(__webpack_require__(20));
-__export(__webpack_require__(4));
-__export(__webpack_require__(8));
-__export(__webpack_require__(1));
-__export(__webpack_require__(9));
-__export(__webpack_require__(64));
-__export(__webpack_require__(65));
-__export(__webpack_require__(13));
-//# sourceMappingURL=index.js.map
-
-
-/***/ }),
-/* 19 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.aliases = {
-    "mathfrak": "frak",
-    "mathcal": "cal",
-    "mathbb": "bb",
-    "mathbf": "bf",
-    "dfrac": "frac",
-    "ldots": "dots"
-};
-//# sourceMappingURL=command-aliases.js.map
-
-/***/ }),
-/* 20 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var options_1 = __webpack_require__(4);
-var latex_parser_1 = __webpack_require__(5);
-var convert_1 = __webpack_require__(22);
-function convertLaTeX(options, src) {
-    return convertLaTeXBlocks(options, latex_parser_1.mustNotBeUndefined(latex_parser_1.mustBeOk(latex_parser_1.latexParser.parse(src)).value));
-}
-exports.convertLaTeX = convertLaTeX;
-function convertLaTeXToUnicode(src) {
-    return convertLaTeXBlocks({
-        translateTo: "unicode",
-        mode: "Any",
-    }, latex_parser_1.mustNotBeUndefined(latex_parser_1.mustBeOk(latex_parser_1.latexParser.parse(src)).value));
-}
-exports.convertLaTeXToUnicode = convertLaTeXToUnicode;
-function convertLaTeXBlocks(options, latex) {
-    var translateTo = options.translateTo;
-    switch (translateTo) {
-        case "html":
-            throw new Error("Unsupported format: '"
-                + translateTo
-                + "'. Use one of: "
-                + Object.keys(options_1.supportedMarkups));
-        case "unicode":
-        default:
-            return convert_1.convertLaTeXBlocksToUnicode(options, latex).result;
-    }
-}
-exports.convertLaTeXBlocks = convertLaTeXBlocks;
-//# sourceMappingURL=convert.js.map
-
-/***/ }),
-/* 21 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var parsimmon_1 = __webpack_require__(7);
-var Syntax_1 = __webpack_require__(3);
-var Syntax_2 = __webpack_require__(3);
-var Utils_1 = __webpack_require__(2);
-var parsimmon_2 = __webpack_require__(7);
-exports.defaultParserConf = {
-    verbatimEnvironments: ["verbatim"]
-};
-exports.takeTill = function (predicate) { return parsimmon_1.takeWhile(function (c) { return !predicate(c); }); };
-var takeTillNewline = parsimmon_1.regexp(/[^\n]*/);
-var maybeNewline = parsimmon_1.regexp(/\n?/);
-var whitespace = parsimmon_1.regexp(/\s*/m);
-var commentSymbol = parsimmon_1.string("%");
-function unsafeUnion(xs, ys) {
-    var xn = xs.length;
-    var yn = ys.length;
-    if (xn === 0) {
-        return ys;
-    }
-    else if (yn === 0) {
-        return xs;
-    }
-    var obj = {};
-    for (var i = 0; i < xn; i++) {
-        obj[xs[i]] = true;
-    }
-    for (var j = 0; j < yn; j++) {
-        obj[ys[j]] = true;
-    }
-    var keys = [];
-    for (var k in obj) {
-        if (obj.hasOwnProperty(k)) {
-            keys.push(k);
-        }
-    }
-    keys.sort();
-    return keys;
-}
-function mergeReplies(result, last) {
-    if (!last) {
-        return result;
-    }
-    if (result.furthest > last.furthest) {
-        return result;
-    }
-    var expected = (result.furthest === last.furthest)
-        ? unsafeUnion(result.expected, last.expected)
-        : last.expected;
-    return {
-        status: result.status,
-        index: result.index,
-        value: result.value,
-        furthest: last.furthest,
-        expected: expected
-    };
-}
-function manyTillAndMap(manyOf, till, map, initial) {
-    return parsimmon_1.Parser(function (input, i) {
-        var accum = initial;
-        var j = 0;
-        var result = undefined;
-        while (i < input.length) {
-            var endCodonFound = till._(input, i);
-            if (endCodonFound.status) {
-                i = Utils_1.mustBeNumber(endCodonFound.index);
-                break;
-            }
-            var bigParse = manyOf._(input, i);
-            if (isNotOk(bigParse))
-                return bigParse;
-            result = Utils_1.mustNotBeUndefined(mergeReplies(bigParse, result));
-            if (isNotOk(result)) {
-                return result;
-            }
-            j++;
-            var value = Utils_1.mustNotBeUndefined(result.value);
-            accum = map(accum, value);
-            i = Utils_1.mustBeNumber(result.index);
-        }
-        var result2 = parsimmon_1.makeSuccess(i, accum);
-        return mustBeOk(mergeReplies(result2, result));
-    });
-}
-function manyTill(manyOf, till) {
-    return manyTillAndMap(manyOf, till, function (a, el) { return a.concat([el]); }, []);
-}
-function token(parser) {
-    return parser.skip(whitespace);
-}
-function word(str) {
-    return parsimmon_1.string(str).thru(token);
-}
-var lbrace = "{";
-var rbrace = "}";
-var lbracket = "[";
-var rbracket = "]";
-var comma = ",";
-var colon = ":";
-var openingBracket = parsimmon_1.string(lbracket);
-var closingBracket = parsimmon_1.string(rbracket);
-var isClosingbracket = function (str) { return str === (rbracket); };
-exports.notTextDefault = {
-    "$": true,
-    "%": true,
-    "\\": true,
-    "{": true,
-    "]": true,
-    "}": true
-};
-exports.notTextMathMode = {
-    "^": true,
-    "_": true,
-    "$": true,
-    "%": true,
-    "\\": true,
-    "{": true,
-    "]": true,
-    "}": true
-};
-exports.notTextMathModeAndNotClosingBracket = {
-    "^": true,
-    "_": true,
-    "$": true,
-    "%": true,
-    "\\": true,
-    "{": true,
-    "}": true
-};
-exports.notTextDefaultAndNotClosingBracket = {
-    "$": true,
-    "%": true,
-    "\\": true,
-    "{": true,
-    "}": true
-};
-function takeAtLeastOneTill(till) {
-    return parsimmon_1.Parser(function (str, i) {
-        var firstChar = str.charAt(i);
-        if (i >= str.length || till(firstChar)) {
-            return parsimmon_2.makeFailure(i, "text character");
-        }
-        else {
-            var strz = [firstChar];
-            i++;
-            var char = str.charAt(i);
-            while (!till(char) && i < str.length) {
-                strz.push(char);
-                i++;
-                char = str.charAt(i);
-            }
-            return parsimmon_1.makeSuccess(i, strz.join(""));
-        }
-    });
-}
-function textParser(notText) {
-    return takeAtLeastOneTill(isNotText(notText))
-        .map(function (match) { return Syntax_2.newTeXRaw(match); });
-}
-exports.textParser = textParser;
-var text = textParser(exports.notTextDefault);
-var text2 = textParser(exports.notTextDefaultAndNotClosingBracket);
-var spaces = parsimmon_1.regexp(/ */)
-    .map(Syntax_2.newTeXRaw);
-exports.comment = commentSymbol
-    .then(takeTillNewline)
-    .skip(maybeNewline)
-    .map(Syntax_1.newTeXComment);
-exports.specialCharsDefault = {
-    "'": true,
-    "(": true,
-    ")": true,
-    ",": true,
-    ".": true,
-    "-": true,
-    '"': true,
-    "!": true,
-    "^": true,
-    "$": true,
-    "&": true,
-    "#": true,
-    "{": true,
-    "}": true,
-    "%": true,
-    "~": true,
-    "|": true,
-    "/": true,
-    ":": true,
-    ";": true,
-    "=": true,
-    "[": true,
-    "]": true,
-    "\\": true,
-    "`": true,
-    " ": true
-};
-function isSpecialCharacter(char, specialChars) {
-    var chars = specialChars === undefined ? exports.specialCharsDefault : specialChars;
-    return chars.hasOwnProperty(char);
-}
-exports.isSpecialCharacter = isSpecialCharacter;
-function isNotText(notText) {
-    return function (char) { return notText.hasOwnProperty(char); };
-}
-exports.isNotText = isNotText;
-exports.mathSymbol = parsimmon_1.string("$");
-exports.commandSymbol = parsimmon_1.string("\\");
-function latexBlockParser(mode, sub, sup) {
-    if (sub === void 0) { sub = "_"; }
-    if (sup === void 0) { sup = "^"; }
-    switch (mode) {
-        case "Math":
-            return exports.latexBlockParserMathMode(sub, sup);
-        default:
-            return exports.latexBlockParserTextMode;
-    }
-}
-exports.latexBlockParser = latexBlockParser;
-exports.latexBlockParserTextMode = parsimmon_1.lazy(function () { return parsimmon_1.alt(parsimmon_1.alt(textParser(exports.notTextDefault), exports.dolMath, exports.comment, textParser(exports.notTextDefaultAndNotClosingBracket), exports.environment, command("Paragraph"))); });
-exports.latexBlockParserMathMode = function (sub, sup) {
-    return parsimmon_1.lazy(function () { return parsimmon_1.alt(parsimmon_1.alt(shiftedScript("Math", sub, sup), textParser(exports.notTextMathMode), exports.dolMath, exports.comment, textParser(exports.notTextMathModeAndNotClosingBracket), exports.environment, command("Math"))); });
-};
-exports.latexParser = exports.latexBlockParserTextMode.many();
-var anonym = parsimmon_1.string(lbrace)
-    .then(exports.latexBlockParserTextMode.many())
-    .skip(parsimmon_1.string(rbrace));
-exports.env = parsimmon_1.Parser(function (input, i) {
-    var beginFound = parsimmon_1.string("\\begin")
-        .then(parsimmon_1.string(lbrace))
-        .then(spaces)
-        .then(parsimmon_1.regexp(/[a-zA-Z]+/))
-        .skip(spaces)
-        .skip(parsimmon_1.string(rbrace))
-        ._(input, i);
-    if (isNotOk(beginFound))
-        return beginFound;
-    i = Utils_1.mustBeNumber(beginFound.index);
-    var envName = beginFound.value;
-    return manyTill(exports.latexBlockParserTextMode, parsimmon_1.string("\\end")
-        .then(parsimmon_1.string(lbrace))
-        .then(spaces)
-        .then(parsimmon_1.string(envName))
-        .then(spaces)
-        .then(parsimmon_1.string(rbrace))).map(function (latex) { return Syntax_1.newTeXEnv(envName, latex); })._(input, i);
-});
-exports.environment = parsimmon_1.alt(anonym, exports.env);
-exports.specialChar = parsimmon_1.test(isSpecialCharacter);
-function isUppercaseAlph(c) {
-    return c >= "A" && c <= "Z";
-}
-function isLowercaseAlph(c) {
-    return c >= "a" && c <= "z";
-}
-exports.endCmd = function (c) { return !isLowercaseAlph(c) && !isUppercaseAlph(c); };
-var openingBrace = parsimmon_1.string("{");
-var closingBrace = parsimmon_1.string("}");
-var isClosingBrace = function (str) { return str === ("}"); };
-function fixArg(mode) {
-    return openingBrace
-        .then(manyTill(latexBlockParser(mode, "_"), closingBrace)).map(Syntax_1.newFixArg);
-}
-exports.fixArg = fixArg;
-function optArg(mode) {
-    return openingBracket
-        .then(manyTill(latexBlockParser(mode), closingBracket))
-        .map(Syntax_1.newOptArg);
-}
-exports.optArg = optArg;
-function cmdArg(mode) {
-    return parsimmon_1.alt(fixArg(mode), optArg(mode));
-}
-exports.cmdArg = cmdArg;
-function cmdArgs(mode) {
-    return parsimmon_1.alt(parsimmon_1.string("{}").map(function () { return []; }), cmdArg(mode).map(function (s) { return s; }).atLeast(0)).map(function (e) { return e; });
-}
-exports.cmdArgs = cmdArgs;
-function command(mode) {
-    return parsimmon_1.seqMap(exports.commandSymbol, parsimmon_1.alt(exports.specialChar, exports.takeTill(exports.endCmd)), cmdArgs(mode), function (ignored, name, argz) {
-        return argz !== undefined ? Syntax_1.newTeXComm.apply(void 0, [name].concat(argz)) : Syntax_1.newTeXComm(name);
-    }).map(function (res) {
-        return res;
-    });
-}
-exports.command = command;
-exports.subOrSuperscriptSymbolParser = function (subscriptSymbol, superscriptSymbol) {
-    return parsimmon_1.alt(parsimmon_1.string(subscriptSymbol), parsimmon_1.string(superscriptSymbol)).map(function (parsedStr) { return (parsedStr === subscriptSymbol ? Syntax_1.SubOrSuperSymbol.SUB : Syntax_1.SubOrSuperSymbol.SUP); });
-};
-function shiftedScript(mode, sub, sup) {
-    return parsimmon_1.seqMap(exports.subOrSuperscriptSymbolParser(sub, sup), cmdArgs(mode), function (symbol, argz) {
-        return Syntax_1.newSubOrSuperScript(symbol, symbol === Syntax_1.SubOrSuperSymbol.SUB ? sub : sup, argz);
-    }).map(function (res) {
-        return res;
-    });
-}
-exports.shiftedScript = shiftedScript;
-exports.dolMath = math();
-function math(mathType, sMath, eMath) {
-    if (mathType === void 0) { mathType = "Dollar"; }
-    if (sMath === void 0) { sMath = "$"; }
-    if (eMath === void 0) { eMath = "$"; }
-    return parsimmon_1.string(sMath)
-        .then(latexBlockParser("Math", "_")
-        .many()
-        .map(function (str) { return Syntax_1.newTeXMath(mathType, sMath, eMath, str); }))
-        .skip(parsimmon_1.string(eMath));
-}
-function isOk(parse) {
-    return parse !== undefined && parse.status === true;
-}
-exports.isOk = isOk;
-function isNotOk(parse) {
-    return parse !== undefined && parse.status === false;
-}
-exports.isNotOk = isNotOk;
-function mustBeOk(parse) {
-    if (!isOk(parse))
-        throw new Error("Expected parse to be success: " + JSON.stringify(parse));
-    return parse;
-}
-exports.mustBeOk = mustBeOk;
-//# sourceMappingURL=Parser.js.map
-
-/***/ }),
-/* 22 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var latex_parser_1 = __webpack_require__(5);
-var unknown_command_1 = __webpack_require__(8);
-var index_1 = __webpack_require__(23);
-var KnownCommand_1 = __webpack_require__(9);
-var index_2 = __webpack_require__(30);
-var index_3 = __webpack_require__(13);
-var sqrt_1 = __webpack_require__(58);
-var index_4 = __webpack_require__(59);
-var index_5 = __webpack_require__(62);
-var CategoryCode_1 = __webpack_require__(6);
-function isString(x) {
-    return typeof x === "string";
-}
-function convertChars(blockIndex, latex) {
-    var start = blockIndex;
-    do
-        blockIndex++;
-    while (latex_parser_1.isTeXChar(latex[blockIndex]));
-    var chars = latex.slice(start, blockIndex);
-    var result = chars.map(function (s) { return s.string; }).join("");
-    return {
-        result: result,
-        blockIndex: blockIndex
-    };
-}
-var regexStartingWhitespace = /^\s*/;
-function convertTeXCommand(options, blockIndex, latex, current) {
-    var value = convertCommand(options, current);
-    if (isString(value)) {
-        return {
-            result: value,
-            blockIndex: blockIndex + 1
-        };
-    }
-    else {
-        var gobbledArguments = [];
-        var rest = [];
-        while (gobbledArguments.length < value.argumentCount && blockIndex < latex.length - 1) {
-            blockIndex++;
-            var nextWordToGobble = blockIndex;
-            if (latex.length < nextWordToGobble - 1)
-                throw new Error("Could not gobble " + value.argumentCount + " arguments for " + current.name);
-            var nextLaTeXBlock = latex[nextWordToGobble];
-            if (latex_parser_1.isTeXRaw(nextLaTeXBlock)) {
-                var whitespaces = /\s+/g;
-                var followingText = nextLaTeXBlock.text.replace(regexStartingWhitespace, "");
-                var restIndex = -1;
-                var lastIndex = 0;
-                while (gobbledArguments.length < value.argumentCount) {
-                    var argMatch = whitespaces.exec(followingText);
-                    if (argMatch) {
-                        var match = followingText.substring(lastIndex, argMatch.index);
-                        restIndex = argMatch.index;
-                        lastIndex = argMatch.index + match.length;
-                        gobbledArguments.push.apply(gobbledArguments, CategoryCode_1.convertToTeXCharsDefault(match));
-                    }
-                    else {
-                        gobbledArguments.push.apply(gobbledArguments, CategoryCode_1.convertToTeXCharsDefault(followingText));
-                        break;
-                    }
-                }
-                if (restIndex >= 0)
-                    rest.push((followingText.substring(restIndex)));
-            }
-            else
-                gobbledArguments.push(nextLaTeXBlock);
-        }
-        blockIndex++;
-        var argumentsToApply = gobbledArguments
-            .map(function (lll) { return convertLaTeXBlocksToUnicode(options, [lll]).result; })
-            .map(latex_parser_1.newTeXRaw)
-            .map(function (latex) { return latex_parser_1.newFixArg([latex]); });
-        if (argumentsToApply.length < value.argumentCount)
-            throw new Error("Could not find enough arguments for command \\" + value.name + ". Expected " + value.argumentCount + ", but found " + argumentsToApply.length);
-        if (!value.apply)
-            throw new Error("Can't apply " + JSON.stringify(value));
-        var result = [
-            value.apply(function () {
-            }, argumentsToApply)
-        ];
-        if (rest.length > 0)
-            result.push(rest.join(""));
-        return {
-            result: result.join(""),
-            blockIndex: blockIndex
-        };
-    }
-}
-function isTeXChar2(x) {
-    return x !== undefined
-        && typeof x.string === "string"
-        && typeof x.category === "number";
-}
-exports.isTeXChar2 = isTeXChar2;
-function convertLaTeXBlocksToUnicode(options, latex) {
-    var blockIndex = 0;
-    if (latex.length <= 0)
-        return {
-            result: "",
-            blockIndex: blockIndex
-        };
-    var finalConversion = [];
-    while (blockIndex < latex.length) {
-        var l = latex[blockIndex];
-        try {
-            if (isTeXChar2(l)) {
-                var convertedChars = convertChars(blockIndex, latex);
-                blockIndex = convertedChars.blockIndex;
-                finalConversion.push(convertedChars.result);
-            }
-            else if (latex_parser_1.isTeXComm(l)) {
-                var res = convertTeXCommand(options, blockIndex, latex, l);
-                blockIndex = res.blockIndex;
-                finalConversion.push(res.result);
-            }
-            else if (latex_parser_1.isFixArg(l) || latex_parser_1.isOptArg(l)) {
-                var res = convertLaTeXBlocksToUnicode(options, l.latex);
-                finalConversion.push(res.result);
-                blockIndex++;
-            }
-            else if (latex_parser_1.isTextHaving(l)) {
-                finalConversion.push(l.text);
-                blockIndex++;
-            }
-            else if (latex_parser_1.isTeXMath(l)) {
-                return convertLaTeXBlocksToUnicode(options, l.latex);
-            }
-            else if (latex_parser_1.isTeXRaw(l)) {
-                finalConversion.push(l.text);
-                blockIndex++;
-            }
-            else if (latex_parser_1.isSubOrSuperScript(l)) {
-                var args = l.arguments ? l.arguments : [];
-                var res = convertTeXCommand(options, blockIndex, latex, latex_parser_1.newTeXComm.apply(void 0, [l.type === latex_parser_1.SubOrSuperSymbol.SUB ? "mathsubscript" : "mathsuperscript"].concat(args)));
-                blockIndex = res.blockIndex;
-                finalConversion.push(res.result);
-            }
-            else if (latex_parser_1.isArray(l)) {
-                var res = convertLaTeXBlocksToUnicode(options, l);
-                finalConversion.push(res.result);
-                blockIndex++;
-            }
-            else {
-                throw new Error("Can't handle LaTeX block yet: " + (JSON.stringify(l)) + ". Leave an issue at https://github.com/digitalheir/tex-to-unicode/issues");
-            }
-        }
-        catch (e) {
-            if (options.onError !== undefined) {
-                var saved = options.onError(e, l);
-                if (saved !== undefined) {
-                    finalConversion.push(saved);
-                    blockIndex++;
-                }
-                else
-                    throw e;
-            }
-            else
-                throw e;
-        }
-    }
-    return {
-        result: finalConversion.join(""),
-        blockIndex: blockIndex
-    };
-}
-exports.convertLaTeXBlocksToUnicode = convertLaTeXBlocksToUnicode;
-function convert1ArgCommand(options, cmd) {
-    if (cmd.arguments.length > 0) {
-        var expanded = index_2.expand1argsCommand(cmd.name, convertLaTeXBlocksToUnicode(options, [cmd.arguments[0]]).result || "");
-        if (cmd.arguments.length > 1)
-            return expanded + convertLaTeXBlocksToUnicode(options, cmd.arguments.slice(1)).result;
-        else
-            return expanded;
-    }
-    else
-        return KnownCommand_1.createCommandHandler(cmd.name, 0, 1, function (cb, texArgs) {
-            var firstArg = texArgs[0];
-            var rest = texArgs.slice(1);
-            var a = index_2.expand1argsCommand(cmd.name, convertLaTeXBlocksToUnicode(options, [firstArg]).result);
-            var b = convertLaTeXBlocksToUnicode(options, rest).result;
-            return a + b;
-        });
-}
-function convert2ArgCommand(options, cmd) {
-    if (cmd.arguments.length > 1) {
-        var expanded = index_4.expand2argsCommand(cmd.name, convertLaTeXBlocksToUnicode(options, [cmd.arguments[0]]).result || "", convertLaTeXBlocksToUnicode(options, [cmd.arguments[1]]).result || "");
-        if (cmd.arguments.length > 2)
-            return expanded + convertLaTeXBlocksToUnicode(options, cmd.arguments.slice(1)).result;
-        else
-            return expanded;
-    }
-    else
-        return KnownCommand_1.createCommandHandler(cmd.name, 0, 2, function (cb, texArgs) {
-            var firstArg = texArgs[0];
-            var secondArg = texArgs[1];
-            var rest = texArgs.slice(2);
-            var a = index_4.expand2argsCommand(cmd.name, convertLaTeXBlocksToUnicode(options, [firstArg]).result, convertLaTeXBlocksToUnicode(options, [secondArg]).result);
-            var b = convertLaTeXBlocksToUnicode(options, rest).result;
-            return a + b;
-        });
-}
-function convertSqrt(options, cmd) {
-    var base = undefined;
-    var nucleus = undefined;
-    var argIndex = 0;
-    while (nucleus === undefined && argIndex < cmd.arguments.length) {
-        var arg = cmd.arguments[argIndex];
-        var argAsString = convertLaTeXBlocksToUnicode(options, [arg]).result;
-        if (latex_parser_1.isOptArg(arg) && !base) {
-            base = argAsString;
-        }
-        else {
-            nucleus = argAsString;
-        }
-        argIndex++;
-    }
-    if (nucleus)
-        return sqrt_1.convertSqrtToUnicode(nucleus, base);
-    else
-        return KnownCommand_1.createCommandHandler(cmd.name, 1, 1, function (cb, texArgs) {
-            var firstArg = texArgs[0];
-            var a = sqrt_1.convertSqrtToUnicode(convertLaTeXBlocksToUnicode(options, [firstArg]).result);
-            if (texArgs.length > 1) {
-                var rest = texArgs.slice(1);
-                var b = convertLaTeXBlocksToUnicode(options, rest).result;
-                return a + b;
-            }
-            return a;
-        });
-}
-function convertCommand(options, cmd) {
-    var commandName = cmd.name;
-    var expanded0args = index_1.expand0argsCommand(commandName);
-    if (!!expanded0args)
-        if (cmd.arguments && cmd.arguments.length > 0)
-            return expanded0args + convertLaTeXBlocksToUnicode(options, cmd.arguments).result;
-        else
-            return expanded0args;
-    else if (index_3.is1argsCommand(commandName)) {
-        return convert1ArgCommand(options, cmd);
-    }
-    else if (index_5.is2argsCommand(commandName)) {
-        return convert2ArgCommand(options, cmd);
-    }
-    else if (commandName === "sqrt") {
-        return convertSqrt(options, cmd);
-    }
-    else {
-        throw unknown_command_1.unknownCommandError(commandName);
-    }
-}
-exports.convertCommand = convertCommand;
-//# sourceMappingURL=convert.js.map
-
-/***/ }),
-/* 23 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var space_1 = __webpack_require__(24);
-var symbols_1 = __webpack_require__(25);
-var barred_letter_1 = __webpack_require__(26);
-var slashed_1 = __webpack_require__(27);
-var cyrillic_1 = __webpack_require__(28);
-var specialchars_1 = __webpack_require__(29);
-exports.expand0argsCommand = function (name) {
-    for (var _i = 0, _a = [
-        barred_letter_1.barredLUnicode,
-        space_1.spaceUnicode,
-        slashed_1.slashedOUnicode,
-        symbols_1.characterUnicode,
-        specialchars_1.specialCharacter,
-        cyrillic_1.cyrillicUnicode
-    ]; _i < _a.length; _i++) {
-        var fn = _a[_i];
-        var result = fn(name);
-        if (!!result)
-            return result;
-    }
-};
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-/* 24 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.mathSpace = "\u8287";
-exports.spaceCharactersUnicode = {
-    ",": "\u2009",
-    "quad": "\u2003",
-    "qquad": "\u2003\u2003",
-    " ": " ",
-    "space": " ",
-    ";": "　",
-    ":": "　",
-    "hfill": "\t"
-};
-function isSpaceCharactersUnicode(x) {
-    return exports.spaceCharactersUnicode.hasOwnProperty(x);
-}
-exports.isSpaceCharactersUnicode = isSpaceCharactersUnicode;
-exports.spaceUnicode = function (name) { return isSpaceCharactersUnicode(name) ? exports.spaceCharactersUnicode[name] : undefined; };
-//# sourceMappingURL=space.js.map
-
-/***/ }),
-/* 25 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.characterUnicodeChart = {
-    "leftrightsquigarrow": "↭",
-    "Longleftrightarrow": "⟺",
-    "blacktriangleright": "▶",
-    "longleftrightarrow": "⟷",
-    "blacktriangledown": "▼",
-    "blacktriangleleft": "◀",
-    "leftrightharpoons": "⇋",
-    "rightleftharpoons": "⇌",
-    "twoheadrightarrow": "↠",
-    "circlearrowright": "↻",
-    "downharpoonright": "⇂",
-    "rightharpoondown": "⇁",
-    "rightrightarrows": "⇉",
-    "twoheadleftarrow": "↞",
-    "vartriangleright": "⊳",
-    "bigtriangledown": "▽",
-    "circlearrowleft": "↺",
-    "curvearrowright": "↷",
-    "downharpoonleft": "⇃",
-    "leftharpoondown": "↽",
-    "leftrightarrows": "⇆",
-    "rightleftarrows": "⇄",
-    "rightsquigarrow": "⇝",
-    "rightthreetimes": "⋌",
-    "trianglerighteq": "⊵",
-    "vartriangleleft": "⊲",
-    "Leftrightarrow": "⇔",
-    "Longrightarrow": "⟹",
-    "curvearrowleft": "↶",
-    "dashrightarrow": "⇢",
-    "doublebarwedge": "⩞",
-    "downdownarrows": "⇊",
-    "hookrightarrow": "↪",
-    "leftleftarrows": "⇇",
-    "leftrightarrow": "↔",
-    "leftthreetimes": "⋋",
-    "longrightarrow": "⟶",
-    "looparrowright": "↬",
-    "rightarrowtail": "↣",
-    "rightharpoonup": "⇀",
-    "sphericalangle": "∢",
-    "textregistered": "®",
-    "trianglelefteq": "⊴",
-    "upharpoonright": "↾",
-    "Longleftarrow": "⟸",
-    "bigtriangleup": "△",
-    "blacktriangle": "▲",
-    "dashleftarrow": "⇠",
-    "divideontimes": "⋇",
-    "fallingdotseq": "≒",
-    "hookleftarrow": "↩",
-    "leftarrowtail": "↢",
-    "leftharpoonup": "↼",
-    "longleftarrow": "⟵",
-    "looparrowleft": "↫",
-    "measuredangle": "∡",
-    "shortparallel": "∥",
-    "smallsetminus": "∖",
-    "texttrademark": "™",
-    "triangleright": "▷",
-    "upharpoonleft": "↿",
-    "blacklozenge": "◆",
-    "risingdotseq": "≓",
-    "triangledown": "▽",
-    "triangleleft": "◁",
-    "Rrightarrow": "⇛",
-    "Updownarrow": "⇕",
-    "backepsilon": "∍",
-    "blacksquare": "■",
-    "circledcirc": "⊚",
-    "circleddash": "⊝",
-    "curlyeqprec": "⋞",
-    "curlyeqsucc": "⋟",
-    "diamondsuit": "♢",
-    "preccurlyeq": "≼",
-    "succcurlyeq": "≽",
-    "textgreater": ">",
-    "thickapprox": "≈",
-    "updownarrow": "↕",
-    "vartriangle": "△",
-    "Lleftarrow": "⇚",
-    "Rightarrow": "⇒",
-    "circledast": "⊛",
-    "complement": "∁",
-    "curlywedge": "⋏",
-    "longmapsto": "⟼",
-    "registered": "®",
-    "rightarrow": "→",
-    "smallfrown": "⌢",
-    "smallsmile": "⌣",
-    "sqsubseteq": "⊑",
-    "sqsupseteq": "⊒",
-    "textlangle": "〈",
-    "textrangle": "〉",
-    "upuparrows": "⇈",
-    "varepsilon": "ε",
-    "varnothing": "∅",
-    "Downarrow": "⇓",
-    "Leftarrow": "⇐",
-    "backprime": "‵",
-    "bigotimes": "⨂",
-    "centerdot": "⋅",
-    "copyright": "©",
-    "downarrow": "↓",
-    "gtreqless": "⋛",
-    "heartsuit": "♡",
-    "leftarrow": "←",
-    "lesseqgtr": "⋚",
-    "pitchfork": "⋔",
-    "spadesuit": "♠",
-    "therefore": "∴",
-    "trademark": "™",
-    "triangleq": "≜",
-    "varpropto": "∝",
-    "approxeq": "≊",
-    "barwedge": "⊼",
-    "bigoplus": "⨁",
-    "bigsqcup": "⨆",
-    "biguplus": "⨄",
-    "bigwedge": "⋀",
-    "boxminus": "⊟",
-    "boxtimes": "⊠",
-    "circledS": "Ⓢ",
-    "clubsuit": "♣",
-    "curlyvee": "⋎",
-    "doteqdot": "≑",
-    "emptyset": "∅",
-    "intercal": "⊺",
-    "leqslant": "⩽",
-    "multimap": "⊸",
-    "parallel": "∥",
-    "setminus": "∖",
-    "sqsubset": "⊏",
-    "sqsupset": "⊐",
-    "subseteq": "⊆",
-    "supseteq": "⊇",
-    "textless": "<",
-    "thicksim": "∼",
-    "triangle": "△",
-    "varkappa": "ϰ",
-    "varsigma": "ς",
-    "vartheta": "ϑ",
-    "Diamond": "◇",
-    "Uparrow": "⇑",
-    "Upsilon": "Υ",
-    "backsim": "∽",
-    "because": "∵",
-    "between": "≬",
-    "bigodot": "⨀",
-    "bigstar": "★",
-    "boxplus": "⊞",
-    "ddagger": "‡",
-    "diamond": "⋄",
-    "digamma": "Ϝ",
-    "dotplus": "∔",
-    "epsilon": "∊",
-    "gtrless": "≷",
-    "implies": "⇒",
-    "leadsto": "↝",
-    "lessdot": "⋖",
-    "lessgtr": "≶",
-    "lesssim": "≲",
-    "lozenge": "◊",
-    "natural": "♮",
-    "nearrow": "↗",
-    "nexists": "∄",
-    "nwarrow": "↖",
-    "partial": "∂",
-    "pilcrow": "¶",
-    "precsim": "≾",
-    "searrow": "↘",
-    "section": "§",
-    "succsim": "≿",
-    "swarrow": "↙",
-    "textbar": "|",
-    "uparrow": "↑",
-    "upsilon": "υ",
-    "Bumpeq": "≎",
-    "Lambda": "Λ",
-    "Subset": "⋐",
-    "Supset": "⋑",
-    "Vvdash": "⊪",
-    "approx": "≈",
-    "bigcap": "⋂",
-    "bigcup": "⋃",
-    "bigvee": "⋁",
-    "bowtie": "⋈",
-    "boxdot": "⊡",
-    "bullet": "∙",
-    "bumpeq": "≏",
-    "circeq": "≗",
-    "coprod": "∐",
-    "dagger": "†",
-    "daleth": "ד",
-    "degree": "°",
-    "eqcirc": "≖",
-    "exists": "∃",
-    "forall": "∀",
-    "gtrdot": "⋗",
-    "gtrsim": "≳",
-    "hslash": "ℏ",
-    "lambda": "λ",
-    "lfloor": "⌊",
-    "ltimes": "⋉",
-    "mapsto": "↦",
-    "models": "⊨",
-    "ominus": "⊖",
-    "oslash": "⊘",
-    "otimes": "⊗",
-    "preceq": "⪯",
-    "propto": "∝",
-    "rfloor": "⌋",
-    "rtimes": "⋊",
-    "square": "□",
-    "subset": "⊂",
-    "succeq": "⪰",
-    "supset": "⊃",
-    "varphi": "φ",
-    "varrho": "ϱ",
-    "veebar": "⊻",
-    "Delta": "Δ",
-    "Gamma": "Γ",
-    "Omega": "Ω",
-    "Theta": "Θ",
-    "Vdash": "⊩",
-    "aleph": "ℵ",
-    "Alpha": "Α",
-    "alpha": "α",
-    "angle": "∠",
-    "asymp": "≍",
-    "cdots": "⋯",
-    "cents": "¢",
-    "dashv": "⊣",
-    "ddots": "⋱",
-    "delta": "δ",
-    "doteq": "≐",
-    "equiv": "≡",
-    "frown": "⌢",
-    "gamma": "γ",
-    "gimel": "ℷ",
-    "infty": "∞",
-    "kappa": "κ",
-    "Kappa": "Κ",
-    "lceil": "⌈",
-    "nabla": "∇",
-    "notin": "∉",
-    "omega": "ω",
-    "oplus": "⊕",
-    "pound": "£",
-    "prime": "′",
-    "qquad": "  ",
-    "rceil": "⌉",
-    "sharp": "♯",
-    "sigma": "σ",
-    "simeq": "≃",
-    "smile": "⌣",
-    "space": "␣",
-    "sqcap": "⊓",
-    "sqcup": "⊔",
-    "theta": "θ",
-    "times": "×",
-    "unlhd": "⊴",
-    "unrhd": "⊵",
-    "uplus": "⊎",
-    "vDash": "⊨",
-    "varpi": "ϖ",
-    "vdash": "⊢",
-    "vdots": "⋮",
-    "wedge": "∧",
-    "Finv": "Ⅎ",
-    "Join": "⋈",
-    "atop": "¦",
-    "beta": "β",
-    "Beta": "Β",
-    "beth": "ב",
-    "cdot": "⋅",
-    "circ": "∘",
-    "cong": "≅",
-    "dots": "…",
-    "euro": "€",
-    "flat": "♭",
-    "geqq": "≧",
-    "hbar": "ℏ",
-    "iota": "ι",
-    "leqq": "≦",
-    "odot": "⊙",
-    "oint": "∮",
-    "perp": "⊥",
-    "prec": "≺",
-    "prod": "∏",
-    "quad": " ",
-    "star": "⋆",
-    "succ": "≻",
-    "surd": "√",
-    "zeta": "ζ",
-    "Box": "□",
-    "Cap": "⋒",
-    "Cup": "⋓",
-    "Lsh": "↰",
-    "Phi": "Φ",
-    "Psi": "Ψ",
-    "Rsh": "↱",
-    "ast": "∗",
-    "bot": "⊥",
-    "cap": "∩",
-    "chi": "χ",
-    "Chi": "Χ",
-    "cup": "∪",
-    "div": "÷",
-    "ell": "ℓ",
-    "eta": "η",
-    "eth": "ð",
-    "geq": "≥",
-    "ggg": "⋙",
-    "int": "∫",
-    "leq": "≤",
-    "lhd": "⊲",
-    "lll": "⋘",
-    "mho": "℧",
-    "mid": "∣",
-    "neg": "¬",
-    "neq": "≠",
-    "phi": "ϕ",
-    "psi": "ψ",
-    "rhd": "⊳",
-    "rho": "ρ",
-    "Rho": "Ρ",
-    "sim": "∼",
-    "sum": "∑",
-    "tau": "τ",
-    "Tau": "Τ",
-    "top": "⊤",
-    "vee": "∨",
-    "Im": "ℑ",
-    "Pi": "Π",
-    "Re": "ℜ",
-    "Xi": "Ξ",
-    "ge": "≥",
-    "gg": "≫",
-    "in": "∈",
-    "le": "≤",
-    "ll": "≪",
-    "mp": "∓",
-    "mu": "μ",
-    "Mu": "Μ",
-    "ni": "∋",
-    "nu": "ν",
-    "Nu": "Ν",
-    "pi": "π",
-    "pm": "±",
-    "wp": "℘",
-    "wr": "≀",
-    "xi": "ξ",
-    "Omicron": "Ο",
-    "omicron": "ο",
-    "textdollar": "$",
-    "textquotesingle": "'",
-    "textbackslash": "\\",
-    "textasciigrave": "`",
-    "lbrace": "{",
-    "vert": "|",
-    "rbrace": "}",
-    "textasciitilde": "~",
-    "textexclamdown": "¡",
-    "textcent": "¢",
-    "textsterling": "£",
-    "textcurrency": "¤",
-    "textyen": "¥",
-    "textbrokenbar": "¦",
-    "textsection": "§",
-    "textasciidieresis": "¨",
-    "textcopyright": "©",
-    "textordfeminine": "ª",
-    "guillemotleft": "«",
-    "lnot": "¬",
-    "textasciimacron": "¯",
-    "textdegree": "°",
-    "textasciiacute": "´",
-    "textparagraph": "¶",
-    "textordmasculine": "º",
-    "guillemotright": "»",
-    "textonequarter": "¼",
-    "textonehalf": "½",
-    "textthreequarters": "¾",
-    "textquestiondown": "¿",
-    "AA": "Å",
-    "AE": "Æ",
-    "DH": "Ð",
-    "texttimes": "×",
-    "TH": "Þ",
-    "ss": "ß",
-    "aa": "å",
-    "ae": "æ",
-    "dh": "ð",
-    "th": "þ",
-    "DJ": "Đ",
-    "dj": "đ",
-    "Elzxh": "ħ",
-    "i": "ı",
-    "NG": "Ŋ",
-    "ng": "ŋ",
-    "OE": "Œ",
-    "oe": "œ",
-    "texthvlig": "ƕ",
-    "textnrleg": "ƞ",
-    "textdoublepipe": "ǂ",
-    "Elztrna": "ɐ",
-    "Elztrnsa": "ɒ",
-    "Elzopeno": "ɔ",
-    "Elzrtld": "ɖ",
-    "Elzschwa": "ə",
-    "Elzpgamma": "ɣ",
-    "Elzpbgam": "ɤ",
-    "Elztrnh": "ɥ",
-    "Elzbtdl": "ɬ",
-    "Elzrtll": "ɭ",
-    "Elztrnm": "ɯ",
-    "Elztrnmlr": "ɰ",
-    "Elzltlmr": "ɱ",
-    "Elzltln": "ɲ",
-    "Elzrtln": "ɳ",
-    "Elzclomeg": "ɷ",
-    "textphi": "ɸ",
-    "Elztrnr": "ɹ",
-    "Elztrnrl": "ɺ",
-    "Elzrttrnr": "ɻ",
-    "Elzrl": "ɼ",
-    "Elzrtlr": "ɽ",
-    "Elzfhr": "ɾ",
-    "Elzrtls": "ʂ",
-    "Elzesh": "ʃ",
-    "Elztrnt": "ʇ",
-    "Elzrtlt": "ʈ",
-    "Elzpupsil": "ʊ",
-    "Elzpscrv": "ʋ",
-    "Elzinvv": "ʌ",
-    "Elzinvw": "ʍ",
-    "Elztrny": "ʎ",
-    "Elzrtlz": "ʐ",
-    "Elzyogh": "ʒ",
-    "Elzglst": "ʔ",
-    "Elzreglst": "ʕ",
-    "Elzinglst": "ʖ",
-    "textturnk": "ʞ",
-    "Elzdyogh": "ʤ",
-    "Elztesh": "ʧ",
-    "textasciicaron": "ˇ",
-    "Elzverts": "ˈ",
-    "Elzverti": "ˌ",
-    "Elzlmrk": "ː",
-    "Elzhlmrk": "ˑ",
-    "Elzsbrhr": "˒",
-    "Elzsblhr": "˓",
-    "Elzrais": "˔",
-    "Elzlow": "˕",
-    "textasciibreve": "˘",
-    "textperiodcentered": "˙",
-    "texttildelow": "˜",
-    "Epsilon": "Ε",
-    "Zeta": "Ζ",
-    "Eta": "Η",
-    "Iota": "Ι",
-    "Sigma": "Σ",
-    "texttheta": "θ",
-    "textvartheta": "ϑ",
-    "Stigma": "Ϛ",
-    "Digamma": "Ϝ",
-    "Koppa": "Ϟ",
-    "Sampi": "Ϡ",
-    "textTheta": "ϴ",
-    "textendash": "–",
-    "textemdash": "—",
-    "Vert": "‖",
-    "Elzreapos": "‛",
-    "textquotedblleft": "“",
-    "textquotedblright": "”",
-    "textdagger": "†",
-    "textdaggerdbl": "‡",
-    "textbullet": "•",
-    "ldots": "…",
-    "textperthousand": "‰",
-    "textpertenthousand": "‱",
-    "guilsinglleft": "‹",
-    "guilsinglright": "›",
-    "nolinebreak": "⁠",
-    "Elzxrat": "℞",
-    "nleftarrow": "↚",
-    "nrightarrow": "↛",
-    "arrowwaveleft": "↜",
-    "arrowwaveright": "↝",
-    "nleftrightarrow": "↮",
-    "dblarrowupdown": "⇅",
-    "nLeftarrow": "⇍",
-    "nLeftrightarrow": "⇎",
-    "nRightarrow": "⇏",
-    "DownArrowUpArrow": "⇵",
-    "rightangle": "∟",
-    "nmid": "∤",
-    "nparallel": "∦",
-    "surfintegral": "∯",
-    "volintegral": "∰",
-    "clwintegral": "∱",
-    "Colon": "∷",
-    "homothetic": "∻",
-    "lazysinv": "∾",
-    "NotEqualTilde": "≂",
-    "approxnotequal": "≆",
-    "tildetrpl": "≋",
-    "allequal": "≌",
-    "NotHumpDownHump": "≎",
-    "NotHumpEqual": "≏",
-    "estimates": "≙",
-    "starequal": "≛",
-    "lneqq": "≨",
-    "lvertneqq": "≨",
-    "gneqq": "≩",
-    "gvertneqq": "≩",
-    "NotLessLess": "≪",
-    "NotGreaterGreater": "≫",
-    "lessequivlnt": "≲",
-    "greaterequivlnt": "≳",
-    "notlessgreater": "≸",
-    "notgreaterless": "≹",
-    "precapprox": "≾",
-    "NotPrecedesTilde": "≾",
-    "succapprox": "≿",
-    "NotSucceedsTilde": "≿",
-    "subsetneq": "⊊",
-    "varsubsetneqq": "⊊",
-    "supsetneq": "⊋",
-    "varsupsetneq": "⊋",
-    "NotSquareSubset": "⊏",
-    "NotSquareSuperset": "⊐",
-    "truestate": "⊧",
-    "forcesextra": "⊨",
-    "VDash": "⊫",
-    "nvdash": "⊬",
-    "nvDash": "⊭",
-    "nVdash": "⊮",
-    "nVDash": "⊯",
-    "original": "⊶",
-    "image": "⊷",
-    "hermitconjmatrix": "⊹",
-    "rightanglearc": "⊾",
-    "backsimeq": "⋍",
-    "verymuchless": "⋘",
-    "verymuchgreater": "⋙",
-    "Elzsqspne": "⋥",
-    "lnsim": "⋦",
-    "gnsim": "⋧",
-    "precedesnotsimilar": "⋨",
-    "succnsim": "⋩",
-    "ntriangleleft": "⋪",
-    "ntriangleright": "⋫",
-    "ntrianglelefteq": "⋬",
-    "ntrianglerighteq": "⋭",
-    "upslopeellipsis": "⋰",
-    "downslopeellipsis": "⋱",
-    "perspcorrespond": "⌆",
-    "recorder": "⌕",
-    "ulcorner": "⌜",
-    "urcorner": "⌝",
-    "llcorner": "⌞",
-    "lrcorner": "⌟",
-    "langle": "〈",
-    "rangle": "〉",
-    "Elzdlcorn": "⎣",
-    "lmoustache": "⎰",
-    "rmoustache": "⎱",
-    "textvisiblespace": "␣",
-    "Elzdshfnc": "┆",
-    "Elzsqfnw": "┙",
-    "diagup": "╱",
-    "Elzvrecto": "▯",
-    "Elzcirfl": "◐",
-    "Elzcirfr": "◑",
-    "Elzcirfb": "◒",
-    "Elzrvbull": "◘",
-    "Elzsqfl": "◧",
-    "Elzsqfr": "◨",
-    "Elzsqfse": "◪",
-    "bigcirc": "◯",
-    "rightmoon": "☾",
-    "mercury": "☿",
-    "venus": "♀",
-    "male": "♂",
-    "jupiter": "♃",
-    "saturn": "♄",
-    "uranus": "♅",
-    "neptune": "♆",
-    "pluto": "♇",
-    "aries": "♈",
-    "taurus": "♉",
-    "gemini": "♊",
-    "cancer": "♋",
-    "leo": "♌",
-    "virgo": "♍",
-    "libra": "♎",
-    "scorpio": "♏",
-    "sagittarius": "♐",
-    "capricornus": "♑",
-    "aquarius": "♒",
-    "pisces": "♓",
-    "quarternote": "♩",
-    "eighthnote": "♪",
-    "UpArrowBar": "⤒",
-    "DownArrowBar": "⤓",
-    "Elolarr": "⥀",
-    "Elorarr": "⥁",
-    "ElzRlarr": "⥂",
-    "ElzrLarr": "⥄",
-    "Elzrarrx": "⥇",
-    "LeftRightVector": "⥎",
-    "RightUpDownVector": "⥏",
-    "DownLeftRightVector": "⥐",
-    "LeftUpDownVector": "⥑",
-    "LeftVectorBar": "⥒",
-    "RightVectorBar": "⥓",
-    "RightUpVectorBar": "⥔",
-    "RightDownVectorBar": "⥕",
-    "DownLeftVectorBar": "⥖",
-    "DownRightVectorBar": "⥗",
-    "LeftUpVectorBar": "⥘",
-    "LeftDownVectorBar": "⥙",
-    "LeftTeeVector": "⥚",
-    "RightTeeVector": "⥛",
-    "RightUpTeeVector": "⥜",
-    "RightDownTeeVector": "⥝",
-    "DownLeftTeeVector": "⥞",
-    "DownRightTeeVector": "⥟",
-    "LeftUpTeeVector": "⥠",
-    "LeftDownTeeVector": "⥡",
-    "UpEquilibrium": "⥮",
-    "ReverseUpEquilibrium": "⥯",
-    "RoundImplies": "⥰",
-    "Elztfnc": "⦀",
-    "Elroang": "⦆",
-    "Elzddfnc": "⦙",
-    "Angle": "⦜",
-    "Elzlpargt": "⦠",
-    "ElzLap": "⧊",
-    "Elzdefas": "⧋",
-    "LeftTriangleBar": "⧏",
-    "NotLeftTriangleBar": "⧏",
-    "RightTriangleBar": "⧐",
-    "NotRightTriangleBar": "⧐",
-    "RuleDelayed": "⧴",
-    "Elxuplus": "⨄",
-    "ElzThr": "⨅",
-    "Elxsqcup": "⨆",
-    "ElzInf": "⨇",
-    "ElzSup": "⨈",
-    "ElzCint": "⨍",
-    "clockoint": "⨏",
-    "sqrint": "⨖",
-    "ElzTimes": "⨯",
-    "amalg": "⨿",
-    "ElzAnd": "⩓",
-    "ElzOr": "⩔",
-    "ElOr": "⩖",
-    "Elzminhat": "⩟",
-    "Equal": "⩵",
-    "nleqslant": "⩽",
-    "geqslant": "⩾",
-    "ngeqslant": "⩾",
-    "lessapprox": "⪅",
-    "gtrapprox": "⪆",
-    "lneq": "⪇",
-    "gneq": "⪈",
-    "lnapprox": "⪉",
-    "gnapprox": "⪊",
-    "lesseqqgtr": "⪋",
-    "gtreqqless": "⪌",
-    "eqslantless": "⪕",
-    "eqslantgtr": "⪖",
-    "NestedLessLess": "⪡",
-    "NotNestedLessLess": "⪡",
-    "NestedGreaterGreater": "⪢",
-    "NotNestedGreaterGreater": "⪢",
-    "precneqq": "⪵",
-    "succneqq": "⪶",
-    "precnapprox": "⪹",
-    "succnapprox": "⪺",
-    "subseteqq": "⫅",
-    "nsubseteqq": "⫅",
-    "supseteqq": "⫆",
-    "subsetneqq": "⫋",
-    "supsetneqq": "⫌",
-    "Elztdcol": "⫶",
-    "openbracketleft": "〚",
-    "openbracketright": "〛",
-    checkmark: "✓",
-    maltese: "✠",
-};
-function isCharacterUnicode(x) {
-    return exports.characterUnicodeChart.hasOwnProperty(x);
-}
-exports.isCharacterUnicode = isCharacterUnicode;
-exports.characterUnicode = function (name) { return isCharacterUnicode(name) ? exports.characterUnicodeChart[name] : undefined; };
-//# sourceMappingURL=symbols.js.map
-
-/***/ }),
-/* 26 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.barredLUnicodeChart = {
-    l: "ł",
-    L: "Ł"
-};
-exports.barredLUnicode = function (name) { return exports.barredLUnicodeChart[name]; };
-//# sourceMappingURL=barred-letter.js.map
-
-/***/ }),
-/* 27 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.slashed_o = "ø";
-exports.slashed_O = "Ø";
-exports.slashedOUnicodeChart = {
-    "o": exports.slashed_o,
-    "O": exports.slashed_O
-};
-exports.slashedOUnicode = function (char) { return exports.slashedOUnicodeChart[char]; };
-//# sourceMappingURL=slashed.js.map
-
-/***/ }),
-/* 28 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.cyrillicUnicodeChart = {
-    "CYRF": "Ф",
-    "CYRII": "І",
-    "CYROMEGA": "Ѡ",
-    "CYRG": "Г",
-    "cyrkvcrs": "ҝ",
-    "cyryo": "ё",
-    "CYRH": "Х",
-    "CYRZHDSC": "Җ",
-    "cyrphk": "ҧ",
-    "CYRTDSC": "Ҭ",
-    "CYRI": "И",
-    "cyryi": "ї",
-    "CYRDZHE": "Џ",
-    "cyriote": "ѥ",
-    "CYRK": "К",
-    "CYRSHHA": "Һ",
-    "CYRL": "Л",
-    "CYRM": "М",
-    "CYRCHLDSC": "Ӌ",
-    "CYRNJE": "Њ",
-    "CYRYAT": "Ѣ",
-    "CYRA": "А",
-    "CYRB": "Б",
-    "cyrchrdsc": "ҷ",
-    "cyrschwa": "ә",
-    "CYRDZE": "Ѕ",
-    "CYRIE": "Є",
-    "CYRC": "Ц",
-    "CYRZH": "Ж",
-    "CYRD": "Д",
-    "CYRABHCHDSC": "Ҿ",
-    "CYRFITA": "Ѳ",
-    "CYRE": "Е",
-    "CYRABHHA": "Ҩ",
-    "cyrya": "я",
-    "cyrdzhe": "џ",
-    "CYRIOTLYUS": "Ѩ",
-    "cyrsemisftsn": "ҍ",
-    "CYRV": "В",
-    "cyrishrt": "й",
-    "cyrdje": "ђ",
-    "cyrchldsc": "ӌ",
-    "CYRY": "Ү",
-    "cyrndsc": "ң",
-    "CYRZ": "З",
-    "CYRKHCRS": "Ҟ",
-    "CYRNG": "Ҥ",
-    "CYRCHRDSC": "Ҷ",
-    "CYRYHCRS": "Ұ",
-    "CYRSHCH": "Щ",
-    "CYRUSHRT": "Ў",
-    "cyryu": "ю",
-    "cyrksi": "ѯ",
-    "CYRN": "Н",
-    "CYRO": "О",
-    "CYRBYUS": "Ѫ",
-    "CYRP": "П",
-    "CYRZDSC": "Ҙ",
-    "CYRAE": "Ӕ",
-    "CYRR": "Р",
-    "CYRS": "С",
-    "CYRT": "Т",
-    "CYRABHCH": "Ҽ",
-    "cyruk": "ѹ",
-    "CYRU": "У",
-    "cyrii": "і",
-    "CYRSEMISFTSN": "Ҍ",
-    "cyrghcrs": "ғ",
-    "CYRISHRT": "Й",
-    "cyromegatitlo": "ѽ",
-    "cyrkbeak": "ҡ",
-    "cyrie": "є",
-    "cyrzdsc": "ҙ",
-    "CYRNDSC": "Ң",
-    "CYRGUP": "Ґ",
-    "cyrshch": "щ",
-    "CYRKHK": "Ӄ",
-    "cyrzh": "ж",
-    "CYRJE": "Ј",
-    "cyrthousands": "҂",
-    "cyrabhch": "ҽ",
-    "textnumero": "№",
-    "cyrng": "ҥ",
-    "CYRPSI": "Ѱ",
-    "CYRTETSE": "Ҵ",
-    "CYRIOTBYUS": "Ѭ",
-    "cyrnje": "њ",
-    "CYRIOTE": "Ѥ",
-    "cyrdze": "ѕ",
-    "cyrae": "ӕ",
-    "CYRHRDSN": "Ъ",
-    "CYRKOPPA": "Ҁ",
-    "CYRRTICK": "Ҏ",
-    "CYRSCHWA": "Ә",
-    "cyrtdsc": "ҭ",
-    "CYRGHK": "Ҕ",
-    "cyrabhha": "ҩ",
-    "cyrshha": "һ",
-    "CYRSH": "Ш",
-    "cyru": "у",
-    "cyrkhcrs": "ҟ",
-    "cyrt": "т",
-    "CYRERY": "Ы",
-    "cyrs": "с",
-    "cyrr": "р",
-    "CYROT": "Ѿ",
-    "cyrlyus": "ѧ",
-    "CYRNHK": "Ӈ",
-    "CYRSFTSN": "Ь",
-    "cyrghk": "ҕ",
-    "cyrp": "п",
-    "cyrabhdze": "ӡ",
-    "cyro": "о",
-    "CYRTSHE": "Ћ",
-    "cyrn": "н",
-    "CYRSDSC": "Ҫ",
-    "cyryhcrs": "ұ",
-    "cyrpsi": "ѱ",
-    "cyrz": "з",
-    "cyry": "ү",
-    "cyrje": "ј",
-    "cyrv": "в",
-    "cyrchvcrs": "ҹ",
-    "cyrkhk": "ӄ",
-    "cyre": "е",
-    "cyromega": "ѡ",
-    "cyrd": "д",
-    "cyrc": "ц",
-    "cyrb": "б",
-    "CYROTLD": "Ө",
-    "cyrgup": "ґ",
-    "CYRLJE": "Љ",
-    "cyra": "а",
-    "CYROMEGATITLO": "Ѽ",
-    "CYRGHCRS": "Ғ",
-    "CYRCHVCRS": "Ҹ",
-    "cyrm": "м",
-    "cyrl": "л",
-    "cyrsh": "ш",
-    "cyrk": "к",
-    "cyri": "и",
-    "cyrh": "х",
-    "CYRHDSC": "Ҳ",
-    "CYRIZH": "Ѵ",
-    "CYRABHDZE": "Ӡ",
-    "cyrkdsc": "қ",
-    "cyrg": "г",
-    "CYRCH": "Ч",
-    "cyrf": "ф",
-    "CYRYI": "Ї",
-    "cyrmillions": "\u0489",
-    "CYRKSI": "Ѯ",
-    "CYROMEGARND": "Ѻ",
-    "cyrot": "ѿ",
-    "cyrtetse": "ҵ",
-    "cyrhdsc": "ҳ",
-    "cyrushrt": "ў",
-    "cyriotlyus": "ѩ",
-    "CYRYA": "Я",
-    "cyrlje": "љ",
-    "cyrotld": "ө",
-    "CYRKDSC": "Қ",
-    "cyrhrdsn": "ъ",
-    "cyrrtick": "ҏ",
-    "cyrkoppa": "ҁ",
-    "CYRDJE": "Ђ",
-    "cyriotbyus": "ѭ",
-    "cyrhundredthousands": "\u0488",
-    "CYRpalochka": "Ӏ",
-    "CYRKVCRS": "Ҝ",
-    "cyromegarnd": "ѻ",
-    "cyrsftsn": "ь",
-    "cyrabhchdsc": "ҿ",
-    "cyrzhdsc": "җ",
-    "cyrerev": "э",
-    "CYRLYUS": "Ѧ",
-    "CYRKBEAK": "Ҡ",
-    "cyrery": "ы",
-    "CYREREV": "Э",
-    "cyrnhk": "ӈ",
-    "cyrsdsc": "ҫ",
-    "cyrch": "ч",
-    "cyrtshe": "ћ",
-    "CYRPHK": "Ҧ",
-    "CYRYO": "Ё",
-    "CYRYU": "Ю",
-    "CYRUK": "Ѹ",
-};
-exports.cyrillicUnicode = function (name) { return exports.cyrillicUnicodeChart[name]; };
-//# sourceMappingURL=cyrillic.js.map
-
-/***/ }),
-/* 29 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.specialCharacters = {
-    "i": "ı",
-    "j": "ȷ",
-    "oe": "œ",
-    "OE": "Œ",
-    "ae": "æ",
-    "AE": "Æ",
-    "aa": "å",
-    "AA": "Å",
-    "o": "ø",
-    "O": "Ø",
-    "ss": "ß",
-    "l": "ł",
-    "L": "Ł"
-};
-function isSpecialCharacter(x) {
-    return exports.specialCharacters.hasOwnProperty(x);
-}
-exports.isSpecialCharacter = isSpecialCharacter;
-exports.specialCharacter = function (name) { return isSpecialCharacter(name) ? exports.specialCharacters[name] : undefined; };
-//# sourceMappingURL=specialchars.js.map
-
-/***/ }),
-/* 30 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var index_1 = __webpack_require__(31);
-var index_2 = __webpack_require__(44);
-var cyrillic_1 = __webpack_require__(53);
-var dingbats_1 = __webpack_require__(54);
-var elsevier_1 = __webpack_require__(55);
-var runes_1 = __webpack_require__(12);
-function expand1argsCommand(name, arg) {
-    switch (name) {
-        case "cyrchar":
-            var c = cyrillic_1.translateCharToCyrillic(arg);
-            if (!!c)
-                return c;
-            break;
-        case "ding":
-        case "dingbat":
-            var d = dingbats_1.translateCharToDingbat(arg);
-            if (!!d)
-                return d;
-            break;
-        case "ElsevierGlyph":
-        case "elsevierglyph":
-        case "elsevier":
-        case "Elsevier":
-            var e = elsevier_1.translateCharToElsevier(arg);
-            if (!!e)
-                return e;
-            break;
-        default:
-            for (var _i = 0, _a = [
-                index_1.diacriticUnicode,
-                index_2.formattingUnicode,
-                runes_1.runeUnicode,
-            ]; _i < _a.length; _i++) {
-                var fn = _a[_i];
-                var result = fn(name, arg);
-                if (!!result)
-                    return result;
-            }
-    }
-    throw new Error("No implementation found to expand \\" + name + " with argument {" + arg + "}");
-}
-exports.expand1argsCommand = expand1argsCommand;
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-/* 31 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var mathring_1 = __webpack_require__(32);
-var acute_1 = __webpack_require__(33);
-var grave_1 = __webpack_require__(34);
-var circumflex_1 = __webpack_require__(35);
-var tilde_1 = __webpack_require__(36);
-var dieresis_1 = __webpack_require__(37);
-var cedilla_1 = __webpack_require__(38);
-var caron_1 = __webpack_require__(39);
-var util_1 = __webpack_require__(1);
-var ogonek_1 = __webpack_require__(40);
-var tie_letters_1 = __webpack_require__(41);
-var vectorArrow_1 = __webpack_require__(42);
-var long_hungarian_umlaut_1 = __webpack_require__(43);
-exports.barUnderLetter = util_1.simpleSuffix("\u0331");
-exports.dotUnderLetter = util_1.simpleSuffix("\u0323");
-exports.breve = util_1.simpleSuffix("\u0306");
-exports.macrron = util_1.simpleSuffix("\u0304");
-exports.dotOverLetter = util_1.simpleSuffix("\u0307");
-exports.modifiersTextModeUnicodeChart = {
-    "`": grave_1.graveAccent,
-    "'": acute_1.acuteAccent,
-    "^": circumflex_1.circumflex,
-    "~": tilde_1.tilde,
-    "=": exports.macrron,
-    ".": exports.dotOverLetter,
-    '"': dieresis_1.dieresis,
-    "H": long_hungarian_umlaut_1.longHungarianUmlaut,
-    "c": cedilla_1.cedilla,
-    "k": ogonek_1.ogonek,
-    "b": exports.barUnderLetter,
-    "d": exports.dotUnderLetter,
-    "r": mathring_1.ringOverLetter,
-    "u": exports.breve,
-    "v": caron_1.caron,
-    "t": tie_letters_1.tieLetters,
-};
-exports.modifiersMathModeUnicodeChart = {
-    "check": caron_1.caron,
-    "acute": acute_1.acuteAccent,
-    "grave": acute_1.acuteAccent,
-    "breve": exports.breve,
-    "vec": vectorArrow_1.vectorArrow,
-    "mathring": mathring_1.ringOverLetter,
-};
-exports.diacriticUnicode = function (str, arg) {
-    var fun = exports.modifiersTextModeUnicodeChart[str];
-    if (!fun)
-        fun = exports.modifiersMathModeUnicodeChart[str];
-    return fun && fun(arg);
-};
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-/* 32 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var command_expander_1 = __webpack_require__(0);
-exports.ringOverLetter = command_expander_1.lookupOrAppend({
-    a: "å",
-    A: "Å",
-    y: "ẙ"
-}, "\u030A");
-//# sourceMappingURL=mathring.js.map
-
-/***/ }),
-/* 33 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var command_expander_1 = __webpack_require__(0);
-exports.acuteAccent = command_expander_1.lookupOrAppend({
-    e: "é",
-    y: "ý",
-    u: "ú",
-    i: "í",
-    o: "ó",
-    a: "á",
-    E: "É",
-    Y: "Ý",
-    U: "Ú",
-    I: "Í",
-    O: "Ó",
-    A: "Á",
-    cyrk: "ќ",
-    cyrg: "ѓ",
-    CYRK: "Ќ",
-    CYRG: "Ѓ",
-}, "\u0301");
-//# sourceMappingURL=acute.js.map
-
-/***/ }),
-/* 34 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var command_expander_1 = __webpack_require__(0);
-exports.graveAccent = command_expander_1.lookupOrAppend({
-    e: "è",
-    u: "ù",
-    i: "ì",
-    o: "ò",
-    a: "à",
-    E: "È",
-    U: "Ù",
-    I: "Ì",
-    O: "Ò",
-    A: "À"
-}, "\u0300");
-//# sourceMappingURL=grave.js.map
-
-/***/ }),
-/* 35 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var command_expander_1 = __webpack_require__(0);
-exports.circumflex = command_expander_1.lookupOrAppend({
-    e: "ê",
-    u: "û",
-    i: "î",
-    o: "ô",
-    a: "â",
-    E: "Ê",
-    U: "Û",
-    I: "Î",
-    O: "Ô",
-    A: "Â"
-}, "\u0302");
-//# sourceMappingURL=circumflex.js.map
-
-/***/ }),
-/* 36 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var command_expander_1 = __webpack_require__(0);
-exports.tilde = command_expander_1.lookupOrAppend({
-    o: "õ",
-    a: "ã",
-    n: "ñ",
-    O: "Õ",
-    A: "Ã",
-    N: "Ñ"
-}, "\u0303");
-//# sourceMappingURL=tilde.js.map
-
-/***/ }),
-/* 37 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var command_expander_1 = __webpack_require__(0);
-exports.dieresis = command_expander_1.lookupOrAppend({
-    e: "ë",
-    y: "ÿ",
-    u: "ü",
-    i: "ï",
-    o: "ö",
-    a: "ä",
-    E: "Ë",
-    Y: "Ÿ",
-    U: "Ü",
-    I: "Ï",
-    O: "Ö",
-    A: "Ä"
-}, "\u0308");
-//# sourceMappingURL=dieresis.js.map
-
-/***/ }),
-/* 38 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var command_expander_1 = __webpack_require__(0);
-exports.cedilla = command_expander_1.lookupOrAppend({
-    c: "ç"
-}, "\u0327");
-//# sourceMappingURL=cedilla.js.map
-
-/***/ }),
-/* 39 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var command_expander_1 = __webpack_require__(0);
-exports.caron = command_expander_1.lookupOrAppend({
-    s: "š"
-}, "\u030C");
-//# sourceMappingURL=caron.js.map
-
-/***/ }),
-/* 40 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var util_1 = __webpack_require__(1);
-exports.ogonek = util_1.simpleSuffix("\u0328");
-//# sourceMappingURL=ogonek.js.map
-
-/***/ }),
-/* 41 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-function tieLetters(chars) {
-    return tie2Letters(chars.charAt(0), chars.substring(1));
-}
-exports.tieLetters = tieLetters;
-function tie2Letters(a, b) {
-    return a + "͡" + b;
-}
-exports.tie2Letters = tie2Letters;
-function isTieLetters(cmdName) {
-    return cmdName === "t";
-}
-exports.isTieLetters = isTieLetters;
-//# sourceMappingURL=tie-letters.js.map
-
-/***/ }),
-/* 42 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var command_expander_1 = __webpack_require__(0);
-exports.vectorArrow = command_expander_1.lookupOrAppend({}, "\u20D7");
-//# sourceMappingURL=vectorArrow.js.map
-
-/***/ }),
-/* 43 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var command_expander_1 = __webpack_require__(0);
-exports.longHungarianUmlaut = command_expander_1.lookupOrAppend({
-    o: "ő",
-    u: "ű",
-    O: "Ő",
-    U: "Ű",
-}, "\u030B");
-//# sourceMappingURL=long-hungarian-umlaut.js.map
-
-/***/ }),
-/* 44 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var blackboard_1 = __webpack_require__(45);
-var boldfont_1 = __webpack_require__(46);
-var fraktur_1 = __webpack_require__(47);
-var italic_1 = __webpack_require__(48);
-var monospace_1 = __webpack_require__(49);
-var textcal_1 = __webpack_require__(50);
-var formatting_1 = __webpack_require__(10);
-var subscript_1 = __webpack_require__(51);
-var superscript_1 = __webpack_require__(11);
-var mono_1 = __webpack_require__(52);
-exports.formattingUnicode = function (cmdName, arg) {
-    var fn = undefined;
-    if (formatting_1.isBbCmd(cmdName))
-        fn = blackboard_1.translateCharToBlackboard;
-    else if (formatting_1.isBfCmd(cmdName))
-        fn = boldfont_1.translateCharToBold;
-    else if (formatting_1.isFrakCmd(cmdName))
-        fn = fraktur_1.translateCharToFraktur;
-    else if (formatting_1.isItCmd(cmdName))
-        fn = italic_1.translateCharToItalic;
-    else if (formatting_1.isTtCmd(cmdName))
-        fn = monospace_1.translateCharToMonospace;
-    else if (formatting_1.isCalCmd(cmdName))
-        fn = textcal_1.translateCharToCalligraphic;
-    else if (formatting_1.isSubCmd(cmdName))
-        fn = subscript_1.translateCharToSubscript;
-    else if (formatting_1.isSupCmd(cmdName))
-        fn = superscript_1.translateCharToSuperscript;
-    else if (formatting_1.isMonoCmd(cmdName))
-        fn = mono_1.translateCharToMono;
-    if (!!fn) {
-        var fun_1 = fn;
-        return arg.split("").map(function (char) { return (fun_1(char) || char); }).join("");
-    }
-    else
-        return undefined;
-};
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-/* 45 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.blackboardCharacters = {
-    "A": "𝔸",
-    "B": "𝔹",
-    "C": "ℂ",
-    "D": "𝔻",
-    "E": "𝔼",
-    "F": "𝔽",
-    "G": "𝔾",
-    "H": "ℍ",
-    "I": "𝕀",
-    "J": "𝕁",
-    "K": "𝕂",
-    "L": "𝕃",
-    "M": "𝕄",
-    "N": "ℕ",
-    "O": "𝕆",
-    "P": "ℙ",
-    "Q": "ℚ",
-    "R": "ℝ",
-    "S": "𝕊",
-    "T": "𝕋",
-    "U": "𝕌",
-    "V": "𝕍",
-    "W": "𝕎",
-    "X": "𝕏",
-    "Y": "𝕐",
-    "Z": "ℤ",
-    "a": "𝕒",
-    "b": "𝕓",
-    "c": "𝕔",
-    "d": "𝕕",
-    "e": "𝕖",
-    "f": "𝕗",
-    "g": "𝕘",
-    "h": "𝕙",
-    "i": "𝕚",
-    "j": "𝕛",
-    "k": "𝕜",
-    "l": "𝕝",
-    "m": "𝕞",
-    "n": "𝕟",
-    "o": "𝕠",
-    "p": "𝕡",
-    "q": "𝕢",
-    "r": "𝕣",
-    "s": "𝕤",
-    "t": "𝕥",
-    "u": "𝕦",
-    "v": "𝕧",
-    "w": "𝕨",
-    "x": "𝕩",
-    "y": "𝕪",
-    "z": "𝕫",
-    "0": "𝟘",
-    "1": "𝟙",
-    "2": "𝟚",
-    "3": "𝟛",
-    "4": "𝟜",
-    "5": "𝟝",
-    "6": "𝟞",
-    "7": "𝟟",
-    "8": "𝟠",
-    "9": "𝟡"
-};
-function isBlackboardCharacter(x) {
-    return exports.blackboardCharacters.hasOwnProperty(x);
-}
-exports.isBlackboardCharacter = isBlackboardCharacter;
-exports.translateCharToBlackboard = function (char) { return isBlackboardCharacter(char) ? exports.blackboardCharacters[char] : undefined; };
-//# sourceMappingURL=blackboard.js.map
-
-/***/ }),
-/* 46 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.boldCharacters = {
-    "A": "𝐀",
-    "B": "𝐁",
-    "C": "𝐂",
-    "D": "𝐃",
-    "E": "𝐄",
-    "F": "𝐅",
-    "G": "𝐆",
-    "H": "𝐇",
-    "I": "𝐈",
-    "J": "𝐉",
-    "K": "𝐊",
-    "L": "𝐋",
-    "M": "𝐌",
-    "N": "𝐍",
-    "O": "𝐎",
-    "P": "𝐏",
-    "Q": "𝐐",
-    "R": "𝐑",
-    "S": "𝐒",
-    "T": "𝐓",
-    "U": "𝐔",
-    "V": "𝐕",
-    "W": "𝐖",
-    "X": "𝐗",
-    "Y": "𝐘",
-    "Z": "𝐙",
-    "a": "𝐚",
-    "b": "𝐛",
-    "c": "𝐜",
-    "d": "𝐝",
-    "e": "𝐞",
-    "f": "𝐟",
-    "g": "𝐠",
-    "h": "𝐡",
-    "i": "𝐢",
-    "j": "𝐣",
-    "k": "𝐤",
-    "l": "𝐥",
-    "m": "𝐦",
-    "n": "𝐧",
-    "o": "𝐨",
-    "p": "𝐩",
-    "q": "𝐪",
-    "r": "𝐫",
-    "s": "𝐬",
-    "t": "𝐭",
-    "u": "𝐮",
-    "v": "𝐯",
-    "w": "𝐰",
-    "x": "𝐱",
-    "y": "𝐲",
-    "z": "𝐳",
-    "Α": "𝚨",
-    "Β": "𝚩",
-    "Γ": "𝚪",
-    "Δ": "𝚫",
-    "Ε": "𝚬",
-    "Ζ": "𝚭",
-    "Η": "𝚮",
-    "Θ": "𝚯",
-    "Ι": "𝚰",
-    "Κ": "𝚱",
-    "Λ": "𝚲",
-    "Μ": "𝚳",
-    "Ν": "𝚴",
-    "Ξ": "𝚵",
-    "Ο": "𝚶",
-    "Π": "𝚷",
-    "Ρ": "𝚸",
-    "ϴ": "𝚹",
-    "Σ": "𝚺",
-    "Τ": "𝚻",
-    "Υ": "𝚼",
-    "Φ": "𝚽",
-    "Χ": "𝚾",
-    "Ψ": "𝚿",
-    "Ω": "𝛀",
-    "∇": "𝛁",
-    "α": "𝛂",
-    "β": "𝛃",
-    "γ": "𝛄",
-    "δ": "𝛅",
-    "ε": "𝛆",
-    "ζ": "𝛇",
-    "η": "𝛈",
-    "θ": "𝛉",
-    "ι": "𝛊",
-    "κ": "𝛋",
-    "λ": "𝛌",
-    "μ": "𝛍",
-    "ν": "𝛎",
-    "ξ": "𝛏",
-    "ο": "𝛐",
-    "π": "𝛑",
-    "ρ": "𝛒",
-    "ς": "𝛓",
-    "σ": "𝛔",
-    "τ": "𝛕",
-    "υ": "𝛖",
-    "φ": "𝛗",
-    "χ": "𝛘",
-    "ψ": "𝛙",
-    "ω": "𝛚",
-    "∂": "𝛛",
-    "ϵ": "𝛜",
-    "ϑ": "𝛝",
-    "ϰ": "𝛞",
-    "ϕ": "𝛟",
-    "ϱ": "𝛠",
-    "ϖ": "𝛡",
-    "0": "𝟎",
-    "1": "𝟏",
-    "2": "𝟐",
-    "3": "𝟑",
-    "4": "𝟒",
-    "5": "𝟓",
-    "6": "𝟔",
-    "7": "𝟕",
-    "8": "𝟖",
-    "9": "𝟗"
-};
-function isBlackboardCharacter(x) {
-    return exports.boldCharacters.hasOwnProperty(x);
-}
-exports.isBlackboardCharacter = isBlackboardCharacter;
-exports.translateCharToBold = function (char) { return isBlackboardCharacter(char) ? exports.boldCharacters[char] : undefined; };
-//# sourceMappingURL=boldfont.js.map
-
-/***/ }),
-/* 47 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.frakturCharacters = {
-    "A": "𝔄",
-    "B": "𝔅",
-    "C": "ℭ",
-    "D": "𝔇",
-    "E": "𝔈",
-    "F": "𝔉",
-    "G": "𝔊",
-    "H": "ℌ",
-    "I": "ℑ",
-    "J": "𝔍",
-    "K": "𝔎",
-    "L": "𝔏",
-    "M": "𝔐",
-    "N": "𝔑",
-    "O": "𝔒",
-    "P": "𝔓",
-    "Q": "𝔔",
-    "R": "ℜ",
-    "S": "𝔖",
-    "T": "𝔗",
-    "U": "𝔘",
-    "V": "𝔙",
-    "W": "𝔚",
-    "X": "𝔛",
-    "Y": "𝔜",
-    "Z": "ℨ",
-    "a": "𝔞",
-    "b": "𝔟",
-    "c": "𝔠",
-    "d": "𝔡",
-    "e": "𝔢",
-    "f": "𝔣",
-    "g": "𝔤",
-    "h": "𝔥",
-    "i": "𝔦",
-    "j": "𝔧",
-    "k": "𝔨",
-    "l": "𝔩",
-    "m": "𝔪",
-    "n": "𝔫",
-    "o": "𝔬",
-    "p": "𝔭",
-    "q": "𝔮",
-    "r": "𝔯",
-    "s": "𝔰",
-    "t": "𝔱",
-    "u": "𝔲",
-    "v": "𝔳",
-    "w": "𝔴",
-    "x": "𝔵",
-    "y": "𝔶",
-    "z": "𝔷"
-};
-function isFrakturCharacter(x) {
-    return exports.frakturCharacters.hasOwnProperty(x);
-}
-exports.isFrakturCharacter = isFrakturCharacter;
-exports.translateCharToFraktur = function (char) { return isFrakturCharacter(char) ? exports.frakturCharacters[char] : undefined; };
-//# sourceMappingURL=fraktur.js.map
-
-/***/ }),
-/* 48 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.italicCharacters = {
-    "A": "𝐴",
-    "B": "𝐵",
-    "C": "𝐶",
-    "D": "𝐷",
-    "E": "𝐸",
-    "F": "𝐹",
-    "G": "𝐺",
-    "H": "𝐻",
-    "I": "𝐼",
-    "J": "𝐽",
-    "K": "𝐾",
-    "L": "𝐿",
-    "M": "𝑀",
-    "N": "𝑁",
-    "O": "𝑂",
-    "P": "𝑃",
-    "Q": "𝑄",
-    "R": "𝑅",
-    "S": "𝑆",
-    "T": "𝑇",
-    "U": "𝑈",
-    "V": "𝑉",
-    "W": "𝑊",
-    "X": "𝑋",
-    "Y": "𝑌",
-    "Z": "𝑍",
-    "a": "𝑎",
-    "b": "𝑏",
-    "c": "𝑐",
-    "d": "𝑑",
-    "e": "𝑒",
-    "f": "𝑓",
-    "g": "𝑔",
-    "h": "ℎ",
-    "i": "𝑖",
-    "j": "𝑗",
-    "k": "𝑘",
-    "l": "𝑙",
-    "m": "𝑚",
-    "n": "𝑛",
-    "o": "𝑜",
-    "p": "𝑝",
-    "q": "𝑞",
-    "r": "𝑟",
-    "s": "𝑠",
-    "t": "𝑡",
-    "u": "𝑢",
-    "v": "𝑣",
-    "w": "𝑤",
-    "x": "𝑥",
-    "y": "𝑦",
-    "z": "𝑧",
-    "Α": "𝛢",
-    "Β": "𝛣",
-    "Γ": "𝛤",
-    "Δ": "𝛥",
-    "Ε": "𝛦",
-    "Ζ": "𝛧",
-    "Η": "𝛨",
-    "Θ": "𝛩",
-    "Ι": "𝛪",
-    "Κ": "𝛫",
-    "Λ": "𝛬",
-    "Μ": "𝛭",
-    "Ν": "𝛮",
-    "Ξ": "𝛯",
-    "Ο": "𝛰",
-    "Π": "𝛱",
-    "Ρ": "𝛲",
-    "ϴ": "𝛳",
-    "Σ": "𝛴",
-    "Τ": "𝛵",
-    "Υ": "𝛶",
-    "Φ": "𝛷",
-    "Χ": "𝛸",
-    "Ψ": "𝛹",
-    "Ω": "𝛺",
-    "∇": "𝛻",
-    "α": "𝛼",
-    "β": "𝛽",
-    "γ": "𝛾",
-    "δ": "𝛿",
-    "ε": "𝜀",
-    "ζ": "𝜁",
-    "η": "𝜂",
-    "θ": "𝜃",
-    "ι": "𝜄",
-    "κ": "𝜅",
-    "λ": "𝜆",
-    "μ": "𝜇",
-    "ν": "𝜈",
-    "ξ": "𝜉",
-    "ο": "𝜊",
-    "π": "𝜋",
-    "ρ": "𝜌",
-    "ς": "𝜍",
-    "σ": "𝜎",
-    "τ": "𝜏",
-    "υ": "𝜐",
-    "φ": "𝜑",
-    "χ": "𝜒",
-    "ψ": "𝜓",
-    "ω": "𝜔",
-    "∂": "𝜕",
-    "ϵ": "𝜖",
-    "ϑ": "𝜗",
-    "ϰ": "𝜘",
-    "ϕ": "𝜙",
-    "ϱ": "𝜚",
-    "ϖ": "𝜛"
-};
-function isItalicCharacter(x) {
-    return exports.italicCharacters.hasOwnProperty(x);
-}
-exports.isItalicCharacter = isItalicCharacter;
-exports.translateCharToItalic = function (char) { return isItalicCharacter(char) ? exports.italicCharacters[char] : undefined; };
-//# sourceMappingURL=italic.js.map
-
-/***/ }),
-/* 49 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.monospaceCharacters = {
-    "A": "𝙰",
-    "B": "𝙱",
-    "C": "𝙲",
-    "D": "𝙳",
-    "E": "𝙴",
-    "F": "𝙵",
-    "G": "𝙶",
-    "H": "𝙷",
-    "I": "𝙸",
-    "J": "𝙹",
-    "K": "𝙺",
-    "L": "𝙻",
-    "M": "𝙼",
-    "N": "𝙽",
-    "O": "𝙾",
-    "P": "𝙿",
-    "Q": "𝚀",
-    "R": "𝚁",
-    "S": "𝚂",
-    "T": "𝚃",
-    "U": "𝚄",
-    "V": "𝚅",
-    "W": "𝚆",
-    "X": "𝚇",
-    "Y": "𝚈",
-    "Z": "𝚉",
-    "a": "𝚊",
-    "b": "𝚋",
-    "c": "𝚌",
-    "d": "𝚍",
-    "e": "𝚎",
-    "f": "𝚏",
-    "g": "𝚐",
-    "h": "𝚑",
-    "i": "𝚒",
-    "j": "𝚓",
-    "k": "𝚔",
-    "l": "𝚕",
-    "m": "𝚖",
-    "n": "𝚗",
-    "o": "𝚘",
-    "p": "𝚙",
-    "q": "𝚚",
-    "r": "𝚛",
-    "s": "𝚜",
-    "t": "𝚝",
-    "u": "𝚞",
-    "v": "𝚟",
-    "w": "𝚠",
-    "x": "𝚡",
-    "y": "𝚢",
-    "z": "𝚣",
-    "0": "𝟶",
-    "1": "𝟷",
-    "2": "𝟸",
-    "3": "𝟹",
-    "4": "𝟺",
-    "5": "𝟻",
-    "6": "𝟼",
-    "7": "𝟽",
-    "8": "𝟾",
-    "9": "𝟿"
-};
-function isMonospaceCharacter(x) {
-    return exports.monospaceCharacters.hasOwnProperty(x);
-}
-exports.isMonospaceCharacter = isMonospaceCharacter;
-exports.translateCharToMonospace = function (char) { return isMonospaceCharacter(char) ? exports.monospaceCharacters[char] : undefined; };
-//# sourceMappingURL=monospace.js.map
-
-/***/ }),
-/* 50 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.calligraphicLetters = {
-    "A": "𝓐",
-    "B": "𝓑",
-    "C": "𝓒",
-    "D": "𝓓",
-    "E": "𝓔",
-    "F": "𝓕",
-    "G": "𝓖",
-    "H": "𝓗",
-    "I": "𝓘",
-    "J": "𝓙",
-    "K": "𝓚",
-    "L": "𝓛",
-    "M": "𝓜",
-    "N": "𝓝",
-    "O": "𝓞",
-    "P": "𝓟",
-    "Q": "𝓠",
-    "R": "𝓡",
-    "S": "𝓢",
-    "T": "𝓣",
-    "U": "𝓤",
-    "V": "𝓥",
-    "W": "𝓦",
-    "X": "𝓧",
-    "Y": "𝓨",
-    "Z": "𝓩",
-    "a": "𝓪",
-    "b": "𝓫",
-    "c": "𝓬",
-    "d": "𝓭",
-    "e": "𝓮",
-    "f": "𝓯",
-    "g": "𝓰",
-    "h": "𝓱",
-    "i": "𝓲",
-    "j": "𝓳",
-    "k": "𝓴",
-    "l": "𝓵",
-    "m": "𝓶",
-    "n": "𝓷",
-    "o": "𝓸",
-    "p": "𝓹",
-    "q": "𝓺",
-    "r": "𝓻",
-    "s": "𝓼",
-    "t": "𝓽",
-    "u": "𝓾",
-    "v": "𝓿",
-    "w": "𝔀",
-    "x": "𝔁",
-    "y": "𝔂",
-    "z": "𝔃"
-};
-function isCalligraphicLetter(x) {
-    return exports.calligraphicLetters.hasOwnProperty(x);
-}
-exports.isCalligraphicLetter = isCalligraphicLetter;
-exports.translateCharToCalligraphic = function (char) { return isCalligraphicLetter(char) ? exports.calligraphicLetters[char] : undefined; };
-//# sourceMappingURL=textcal.js.map
-
-/***/ }),
-/* 51 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.subscriptCharacters = {
-    "0": "₀",
-    "1": "₁",
-    "2": "₂",
-    "3": "₃",
-    "4": "₄",
-    "5": "₅",
-    "6": "₆",
-    "7": "₇",
-    "8": "₈",
-    "9": "₉",
-    "+": "₊",
-    "-": "₋",
-    "=": "₌",
-    "(": "₍",
-    ")": "₎",
-    "a": "ₐ",
-    "e": "ₑ",
-    "h": "ₕ",
-    "i": "ᵢ",
-    "j": "ⱼ",
-    k: "ₖ",
-    l: "ₗ",
-    m: "ₘ",
-    n: "ₙ",
-    "o": "ₒ",
-    p: "ₚ",
-    "r": "ᵣ",
-    s: "ₛ",
-    t: "ₜ",
-    "u": "ᵤ",
-    "v": "ᵥ",
-    "x": "ₓ",
-    "β": "ᵦ",
-    "γ": "ᵧ",
-    "ρ": "ᵨ",
-    "φ": "ᵩ",
-    "χ": "ᵪ"
-};
-function isSubscriptCharacter(x) {
-    return exports.subscriptCharacters.hasOwnProperty(x);
-}
-exports.isSubscriptCharacter = isSubscriptCharacter;
-exports.translateCharToSubscript = function (char) { return isSubscriptCharacter(char) ? exports.subscriptCharacters[char] : undefined; };
-//# sourceMappingURL=subscript.js.map
-
-/***/ }),
-/* 52 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.monoCharacters = {
-    "A": "𝙰",
-    "B": "𝙱",
-    "C": "𝙲",
-    "D": "𝙳",
-    "E": "𝙴",
-    "F": "𝙵",
-    "G": "𝙶",
-    "H": "𝙷",
-    "I": "𝙸",
-    "J": "𝙹",
-    "K": "𝙺",
-    "L": "𝙻",
-    "M": "𝙼",
-    "N": "𝙽",
-    "O": "𝙾",
-    "P": "𝙿",
-    "Q": "𝚀",
-    "R": "𝚁",
-    "S": "𝚂",
-    "T": "𝚃",
-    "U": "𝚄",
-    "V": "𝚅",
-    "W": "𝚆",
-    "X": "𝚇",
-    "Y": "𝚈",
-    "Z": "𝚉",
-    "a": "𝚊",
-    "b": "𝚋",
-    "c": "𝚌",
-    "d": "𝚍",
-    "e": "𝚎",
-    "f": "𝚏",
-    "g": "𝚐",
-    "h": "𝚑",
-    "i": "𝚒",
-    "j": "𝚓",
-    "k": "𝚔",
-    "l": "𝚕",
-    "m": "𝚖",
-    "n": "𝚗",
-    "o": "𝚘",
-    "p": "𝚙",
-    "q": "𝚚",
-    "r": "𝚛",
-    "s": "𝚜",
-    "t": "𝚝",
-    "u": "𝚞",
-    "v": "𝚟",
-    "w": "𝚠",
-    "x": "𝚡",
-    "y": "𝚢",
-    "z": "𝚣",
-    "0": "𝟶",
-    "1": "𝟷",
-    "2": "𝟸",
-    "3": "𝟹",
-    "4": "𝟺",
-    "5": "𝟻",
-    "6": "𝟼",
-    "7": "𝟽",
-    "8": "𝟾",
-    "9": "𝟿",
-};
-function isMonoCharacter(x) {
-    return exports.monoCharacters.hasOwnProperty(x);
-}
-exports.isMonoCharacter = isMonoCharacter;
-exports.translateCharToMono = function (char) { return isMonoCharacter(char) ? exports.monoCharacters[char] : undefined; };
-//# sourceMappingURL=mono.js.map
-
-/***/ }),
-/* 53 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.cyrillicCharacters = {
-    "Ф": "Ф",
-    "І": "І",
-    "Ѡ": "Ѡ",
-    "Г": "Г",
-    "ҝ": "ҝ",
-    "ё": "ё",
-    "Х": "Х",
-    "Җ": "Җ",
-    "ҧ": "ҧ",
-    "Ҭ": "Ҭ",
-    "И": "И",
-    "ї": "ї",
-    "Џ": "Џ",
-    "ѥ": "ѥ",
-    "К": "К",
-    "Һ": "Һ",
-    "Л": "Л",
-    "М": "М",
-    "Ӌ": "Ӌ",
-    "Њ": "Њ",
-    "Ѣ": "Ѣ",
-    "А": "А",
-    "Б": "Б",
-    "ҷ": "ҷ",
-    "ә": "ә",
-    "Ѕ": "Ѕ",
-    "Є": "Є",
-    "Ц": "Ц",
-    "Ж": "Ж",
-    "Д": "Д",
-    "Ҿ": "Ҿ",
-    "Ѳ": "Ѳ",
-    "Е": "Е",
-    "Ҩ": "Ҩ",
-    "я": "я",
-    "џ": "џ",
-    "Ѩ": "Ѩ",
-    "ҍ": "ҍ",
-    "В": "В",
-    "й": "й",
-    "ђ": "ђ",
-    "ӌ": "ӌ",
-    "Ү": "Ү",
-    "ң": "ң",
-    "З": "З",
-    "Ҟ": "Ҟ",
-    "Ҥ": "Ҥ",
-    "Ҷ": "Ҷ",
-    "Ұ": "Ұ",
-    "Щ": "Щ",
-    "Ў": "Ў",
-    "ю": "ю",
-    "ѯ": "ѯ",
-    "Н": "Н",
-    "О": "О",
-    "Ѫ": "Ѫ",
-    "П": "П",
-    "Ҙ": "Ҙ",
-    "Ӕ": "Ӕ",
-    "Р": "Р",
-    "С": "С",
-    "Т": "Т",
-    "Ҽ": "Ҽ",
-    "ѹ": "ѹ",
-    "У": "У",
-    "і": "і",
-    "Ҍ": "Ҍ",
-    "ғ": "ғ",
-    "Й": "Й",
-    "ѽ": "ѽ",
-    "ҡ": "ҡ",
-    "є": "є",
-    "ҙ": "ҙ",
-    "Ң": "Ң",
-    "Ґ": "Ґ",
-    "щ": "щ",
-    "Ӄ": "Ӄ",
-    "ж": "ж",
-    "Ј": "Ј",
-    "҂": "҂",
-    "ҽ": "ҽ",
-    "№": "№",
-    "ҥ": "ҥ",
-    "Ѱ": "Ѱ",
-    "Ҵ": "Ҵ",
-    "Ѭ": "Ѭ",
-    "њ": "њ",
-    "Ѥ": "Ѥ",
-    "ѕ": "ѕ",
-    "ӕ": "ӕ",
-    "Ъ": "Ъ",
-    "Ҁ": "Ҁ",
-    "Ҏ": "Ҏ",
-    "Ә": "Ә",
-    "ҭ": "ҭ",
-    "Ҕ": "Ҕ",
-    "ҩ": "ҩ",
-    "һ": "һ",
-    "Ш": "Ш",
-    "у": "у",
-    "ҟ": "ҟ",
-    "т": "т",
-    "Ы": "Ы",
-    "с": "с",
-    "р": "р",
-    "Ѿ": "Ѿ",
-    "ѧ": "ѧ",
-    "Ӈ": "Ӈ",
-    "Ь": "Ь",
-    "ҕ": "ҕ",
-    "п": "п",
-    "ӡ": "ӡ",
-    "о": "о",
-    "Ћ": "Ћ",
-    "н": "н",
-    "Ҫ": "Ҫ",
-    "ұ": "ұ",
-    "ѱ": "ѱ",
-    "з": "з",
-    "ү": "ү",
-    "\u030F": "\u030F",
-    "ј": "ј",
-    "в": "в",
-    "ҹ": "ҹ",
-    "ӄ": "ӄ",
-    "е": "е",
-    "ѡ": "ѡ",
-    "д": "д",
-    "ц": "ц",
-    "б": "б",
-    "Ө": "Ө",
-    "ґ": "ґ",
-    "Љ": "Љ",
-    "а": "а",
-    "Ѽ": "Ѽ",
-    "Ғ": "Ғ",
-    "Ҹ": "Ҹ",
-    "м": "м",
-    "л": "л",
-    "ш": "ш",
-    "к": "к",
-    "и": "и",
-    "х": "х",
-    "Ҳ": "Ҳ",
-    "Ѵ": "Ѵ",
-    "Ӡ": "Ӡ",
-    "қ": "қ",
-    "г": "г",
-    "Ч": "Ч",
-    "ф": "ф",
-    "Ї": "Ї",
-    "\u0489": "\u0489",
-    "Ѯ": "Ѯ",
-    "Ѻ": "Ѻ",
-    "ѿ": "ѿ",
-    "ҵ": "ҵ",
-    "ҳ": "ҳ",
-    "ў": "ў",
-    "ѩ": "ѩ",
-    "Я": "Я",
-    "љ": "љ",
-    "ө": "ө",
-    "Қ": "Қ",
-    "ъ": "ъ",
-    "ҏ": "ҏ",
-    "ҁ": "ҁ",
-    "Ђ": "Ђ",
-    "ѭ": "ѭ",
-    "\u0488": "\u0488",
-    "Ӏ": "Ӏ",
-    "Ҝ": "Ҝ",
-    "ѻ": "ѻ",
-    "ь": "ь",
-    "ҿ": "ҿ",
-    "җ": "җ",
-    "э": "э",
-    "Ѧ": "Ѧ",
-    "Ҡ": "Ҡ",
-    "ы": "ы",
-    "Э": "Э",
-    "ӈ": "ӈ",
-    "ҫ": "ҫ",
-    "ч": "ч",
-    "ћ": "ћ",
-    "Ҧ": "Ҧ",
-    "Ё": "Ё",
-    "Ю": "Ю",
-    "Ѹ": "Ѹ",
-    "ќ": "ќ",
-    "ѓ": "ѓ",
-    "Ќ": "Ќ",
-    "Ѓ": "Ѓ"
-};
-exports.isCyrillicCharacter = function (x) {
-    return exports.cyrillicCharacters.hasOwnProperty(x);
-};
-exports.translateCharToCyrillic = function (char) {
-    if (exports.isCyrillicCharacter(char))
-        return exports.cyrillicCharacters[char];
-    else
-        return undefined;
-};
-//# sourceMappingURL=cyrillic.js.map
-
-/***/ }),
-/* 54 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.dingbatsUnicodeChart = {
-    "33": "✁",
-    "34": "✂",
-    "35": "✃",
-    "36": "✄",
-    "37": "☎",
-    "38": "✆",
-    "39": "✇",
-    "40": "✈",
-    "41": "✉",
-    "42": "☛",
-    "43": "☞",
-    "44": "✌",
-    "45": "✍",
-    "46": "✎",
-    "47": "✏",
-    "48": "✐",
-    "49": "✑",
-    "50": "✒",
-    "51": "✓",
-    "52": "✔",
-    "53": "✕",
-    "54": "✖",
-    "55": "✗",
-    "56": "✘",
-    "57": "✙",
-    "58": "✚",
-    "59": "✛",
-    "60": "✜",
-    "61": "✝",
-    "62": "✞",
-    "63": "✟",
-    "64": "✠",
-    "65": "✡",
-    "66": "✢",
-    "67": "✣",
-    "68": "✤",
-    "69": "✥",
-    "70": "✦",
-    "71": "✧",
-    "72": "★",
-    "73": "✩",
-    "74": "✪",
-    "75": "✫",
-    "76": "✬",
-    "77": "✭",
-    "78": "✮",
-    "79": "✯",
-    "80": "✰",
-    "81": "✱",
-    "82": "✲",
-    "83": "✳",
-    "84": "✴",
-    "85": "✵",
-    "86": "✶",
-    "87": "✷",
-    "88": "✸",
-    "89": "✹",
-    "90": "✺",
-    "91": "✻",
-    "92": "✼",
-    "93": "✽",
-    "94": "✾",
-    "95": "✿",
-    "96": "❀",
-    "97": "❁",
-    "98": "❂",
-    "99": "❃",
-    "100": "❄",
-    "101": "❅",
-    "102": "❆",
-    "103": "❇",
-    "104": "❈",
-    "105": "❉",
-    "106": "❊",
-    "107": "❋",
-    "108": "●",
-    "109": "❍",
-    "110": "■",
-    "111": "❏",
-    "112": "❐",
-    "113": "❑",
-    "114": "❒",
-    "115": "▲",
-    "116": "▼",
-    "117": "◆",
-    "118": "❖",
-    "119": "◗",
-    "120": "❘",
-    "121": "❙",
-    "122": "❚",
-    "123": "❛",
-    "124": "❜",
-    "125": "❝",
-    "126": "❞",
-    "161": "❡",
-    "162": "❢",
-    "163": "❣",
-    "164": "❤",
-    "165": "❥",
-    "166": "❦",
-    "167": "❧",
-    "168": "♣",
-    "169": "♦",
-    "170": "♥",
-    "171": "♠",
-    "172": "①",
-    "173": "②",
-    "174": "③",
-    "175": "④",
-    "176": "⑤",
-    "177": "⑥",
-    "178": "⑦",
-    "179": "⑧",
-    "180": "⑨",
-    "181": "⑩",
-    "182": "❶",
-    "183": "❷",
-    "184": "❸",
-    "185": "❹",
-    "186": "❺",
-    "187": "❻",
-    "188": "❼",
-    "189": "❽",
-    "190": "❾",
-    "191": "❿",
-    "192": "➀",
-    "193": "➁",
-    "194": "➂",
-    "195": "➃",
-    "196": "➄",
-    "197": "➅",
-    "198": "➆",
-    "199": "➇",
-    "200": "➈",
-    "201": "➉",
-    "202": "➊",
-    "203": "➋",
-    "204": "➌",
-    "205": "➍",
-    "206": "➎",
-    "207": "➏",
-    "208": "➐",
-    "209": "➑",
-    "210": "➒",
-    "211": "➓",
-    "212": "➔",
-    "213": "→",
-    "214": "↔",
-    "215": "↕",
-    "216": "➘",
-    "217": "➙",
-    "218": "➚",
-    "219": "➛",
-    "220": "➜",
-    "221": "➝",
-    "222": "➞",
-    "223": "➟",
-    "224": "➠",
-    "225": "➡",
-    "226": "➢",
-    "227": "➣",
-    "228": "➤",
-    "229": "➥",
-    "230": "➦",
-    "231": "➧",
-    "232": "➨",
-    "233": "➩",
-    "234": "➪",
-    "235": "➫",
-    "236": "➬",
-    "237": "➭",
-    "238": "➮",
-    "239": "➯",
-    "241": "➱",
-    "242": "➲",
-    "243": "➳",
-    "244": "➴",
-    "245": "➵",
-    "246": "➶",
-    "247": "➷",
-    "248": "➸",
-    "249": "➹",
-    "250": "➺",
-    "251": "➻",
-    "252": "➼",
-    "253": "➽",
-    "254": "➾"
-};
-function isDingbatCharacter(x) {
-    return exports.dingbatsUnicodeChart.hasOwnProperty(x);
-}
-exports.isDingbatCharacter = isDingbatCharacter;
-exports.translateCharToDingbat = function (char) { return isDingbatCharacter(char) ? exports.dingbatsUnicodeChart[char] : undefined; };
-//# sourceMappingURL=dingbats.js.map
-
-/***/ }),
-/* 55 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.elsevierGlyphsUnicodeChart = {
-    "2129": "℩",
-    "21B3": "↳",
-    "2232": "∲",
-    "2233": "∳",
-    "2238": "∸",
-    "2242": "≂",
-    "225A": "≚",
-    "225F": "≟",
-    "2274": "≴",
-    "2275": "≵",
-    "22C0": "⋀",
-    "22C1": "⋁",
-    "E838": "⌽",
-    "E381": "▱",
-    "E212": "⤅",
-    "E20C": "⤣",
-    "E20D": "⤤",
-    "E20B": "⤥",
-    "E20A": "⤦",
-    "E211": "⤧",
-    "E20E": "⤨",
-    "E20F": "⤩",
-    "E210": "⤪",
-    "E21C": "⤳",
-    "E21D": "⤳",
-    "E21A": "⤶",
-    "E219": "⤷",
-    "E214": "⥼",
-    "E215": "⥽",
-    "E291": "⦔",
-    "E260": "⦵",
-    "E61B": "⦶",
-    "E372": "⧜",
-    "E395": "⨐",
-    "E25A": "⨥",
-    "E25B": "⨪",
-    "E25C": "⨭",
-    "E25D": "⨮",
-    "E25E": "⨴",
-    "E25F": "⨵",
-    "E259": "⨼",
-    "E36E": "⩕",
-    "E30D": "⫫",
-    "300A": "《",
-    "300B": "》",
-    "3018": "〘",
-    "3019": "〙",
-};
-function isElsevierGlyph(x) {
-    return exports.elsevierGlyphsUnicodeChart.hasOwnProperty(x);
-}
-exports.isElsevierGlyph = isElsevierGlyph;
-exports.translateCharToElsevier = function (char) { return isElsevierGlyph(char) ? exports.elsevierGlyphsUnicodeChart[char] : undefined; };
-//# sourceMappingURL=elsevier.js.map
-
-/***/ }),
-/* 56 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.spaceCmds1arg = {
-    kern: true,
-    hskip: true,
-    hspace: true,
-    hphantom: true,
-};
-//# sourceMappingURL=space.js.map
-
-/***/ }),
-/* 57 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.diacriticsTextMode = {
-    "`": true,
-    "'": true,
-    "^": true,
-    "~": true,
-    "=": true,
-    ".": true,
-    '"': true,
-    "H": true,
-    "c": true,
-    "k": true,
-    "b": true,
-    "d": true,
-    "r": true,
-    "u": true,
-    "v": true,
-};
-exports.diacriticsMathMode = {
-    "hat": true,
-    "widehat": true,
-    "check": true,
-    "tilde": true,
-    "widetilde": true,
-    "acute": true,
-    "grave": true,
-    "dot": true,
-    "ddot": true,
-    "breve": true,
-    "bar": true,
-    "vec": true,
-    "mathring": true,
-};
-//# sourceMappingURL=diacritic.js.map
-
-/***/ }),
-/* 58 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var superscript_1 = __webpack_require__(11);
-function determineSqrtSymbol(base) {
-    var trimmd = base ? base.trim() : undefined;
-    if (!trimmd)
-        return "√";
-    switch (trimmd) {
-        case "2":
-            return "√";
-        case "3":
-            return "∛";
-        case "4":
-            return "∜";
-        default:
-            var chars = [];
-            for (var i = 0; i < trimmd.length; i++) {
-                var char = superscript_1.translateCharToSuperscript(trimmd.charAt(i));
-                if (!char)
-                    throw new Error("Could not translate \"" + char + "\" to superscript");
-                chars.push(char);
-            }
-            return chars.join("") + "√";
-    }
-}
-function convertSqrtToUnicode(nucleus, base) {
-    var sqrt = determineSqrtSymbol(base);
-    var trimmedNucleus = nucleus.trim();
-    if (trimmedNucleus === "") {
-        return sqrt;
-    }
-    else {
-        return sqrt + "(" + trimmedNucleus + ")";
-    }
-}
-exports.convertSqrtToUnicode = convertSqrtToUnicode;
-//# sourceMappingURL=sqrt.js.map
-
-/***/ }),
-/* 59 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var frac_1 = __webpack_require__(60);
-var binom_1 = __webpack_require__(61);
-function expand2argsCommand(name, arg1, arg2) {
-    switch (name) {
-        case "frac":
-        case "nfrac":
-        case "cfrac":
-        case "xfrac":
-        case "sfrac":
-            return frac_1.convertFracToUnicode(arg1, arg2);
-        case "binom":
-            return binom_1.convertBinom(arg1, arg2);
-    }
-    throw new Error("No implementation found to expand \\" + name + " with arguments {" + arg1 + ", " + arg2);
-}
-exports.expand2argsCommand = expand2argsCommand;
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-/* 60 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var util_1 = __webpack_require__(1);
-var zeroWidthNonJoiner = "\u200C";
-var regExpDigit = /^[0-9]*$/;
-function convertFracToUnicode(n, d) {
-    if (n === "1" && d === "2")
-        return "½";
-    if (n === "1" && d === "3")
-        return "⅓";
-    if (n === "1" && d === "4")
-        return "¼";
-    if (n === "1" && d === "5")
-        return "⅕";
-    if (n === "1" && d === "6")
-        return "⅙";
-    if (n === "1" && d === "8")
-        return "⅛";
-    if (n === "2" && d === "3")
-        return "⅔";
-    if (n === "2" && d === "5")
-        return "⅖";
-    if (n === "3" && d === "4")
-        return "¾";
-    if (n === "3" && d === "5")
-        return "⅗";
-    if (n === "3" && d === "8")
-        return "⅜";
-    if (n === "4" && d === "5")
-        return "⅘";
-    if (n === "5" && d === "6")
-        return "⅚";
-    if (n === "5" && d === "8")
-        return "⅝";
-    if (n === "7" && d === "8")
-        return "⅞";
-    if (regExpDigit.test(n) && regExpDigit.test(d)) {
-        return zeroWidthNonJoiner + n + "⁄" + d + zeroWidthNonJoiner;
-    }
-    n = util_1.isSingleTerm.test(n) ? n : util_1.addParenthesis(n);
-    d = util_1.isSingleTerm.test(d) ? d : util_1.addParenthesis(d);
-    return "(" + n + " / " + d + ")";
-}
-exports.convertFracToUnicode = convertFracToUnicode;
-//# sourceMappingURL=frac.js.map
-
-/***/ }),
-/* 61 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var util_1 = __webpack_require__(1);
-var isSingleTerm = /^.$|^[0-9]+$/;
-function convertBinom(n, d) {
-    n = isSingleTerm.test(n) ? n : util_1.addParenthesis(n);
-    d = isSingleTerm.test(d) ? d : util_1.addParenthesis(d);
-    return "(" + n + " \u00A6 " + d + ")";
-}
-exports.convertBinom = convertBinom;
-//# sourceMappingURL=binom.js.map
-
-/***/ }),
-/* 62 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var frac_1 = __webpack_require__(63);
-exports.twoArgsCommands = Object.assign({}, frac_1.fracCmds, {
-    "binom": true
-});
-function is2argsCommand(name) {
-    return exports.twoArgsCommands.hasOwnProperty(name);
-}
-exports.is2argsCommand = is2argsCommand;
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-/* 63 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.fracCmds = {
-    "frac": true,
-    "nfrac": true,
-    "cfrac": true,
-    "xfrac": true,
-    "sfrac": true,
-};
-function isFracCmd(x) {
-    return exports.fracCmds.hasOwnProperty(x);
-}
-exports.isFracCmd = isFracCmd;
-//# sourceMappingURL=frac.js.map
-
-/***/ }),
-/* 64 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-function createKnownCommand(name) {
-    return {
-        name: name,
-        optionalArguments: 0,
-        argumentCount: 0
-    };
-}
-exports.createKnownCommand = createKnownCommand;
-//# sourceMappingURL=KnownCommand0Args.js.map
-
-/***/ }),
-/* 65 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-function createKnownCommandWith1Arg(name) {
-    return {
-        name: name,
-        optionalArguments: 0,
-        argumentCount: 1
-    };
-}
-exports.createKnownCommandWith1Arg = createKnownCommandWith1Arg;
-//# sourceMappingURL=KnownCommand1Args.js.map
+eval("module.exports = require(\"path\");\n\n//# sourceURL=webpack://bib2hugo/external_%22path%22?");
 
 /***/ })
-/******/ ]);
+
+/******/ });
 });

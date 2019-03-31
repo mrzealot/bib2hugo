@@ -4,6 +4,7 @@ var path = require('path');
 var libraryName = 'bib2hugo';
 
 var config = {
+    mode: 'development',
     entry: path.join(__dirname, libraryName + '.js'),
     output: {
         path: path.join(__dirname, 'dist'),
